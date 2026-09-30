@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "判斷紀錄 擷取器",
+  "version": "0.6.0",
+  "description": "在你跟 AI 對話的當下把往返擷取下來，成為判斷紀錄的原始資料。",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://*.supabase.co/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "判斷紀錄 擷取器"
+  }
+}

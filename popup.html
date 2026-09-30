@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>判斷紀錄 擷取器</title>
+<style>
+:root{
+  --paper:#F4F5F3; --surface:#FFFFFF; --ink:#14201C; --ink-2:#3E4B45;
+  --muted:#6B7770; --faint:#9AA5A0; --line:#DCDFDA; --line-2:#E9EBE7;
+  --accent:#0F5C4A; --accent-soft:#E4EFEA; --warn:#B06A16;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:380px;max-height:560px;overflow-y:auto;background:var(--paper);color:var(--ink);
+  font-family:var(--sans);font-size:14px;line-height:1.65;padding:16px}
+h1{font-size:15px;letter-spacing:.03em}
+.sub{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--faint);margin-top:1px}
+.status{margin-top:12px;padding:9px 12px;border-left:3px solid var(--accent);
+  background:var(--accent-soft);border-radius:0 6px 6px 0;font-size:12.5px;color:var(--ink-2)}
+.status.warn{border-left-color:var(--warn);background:#FDF6EC}
+.list{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.conv{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.conv h2{font-size:13.5px;font-weight:500;line-height:1.45}
+.conv .meta{font-family:var(--mono);font-size:11px;color:var(--faint);
+  font-variant-numeric:tabular-nums;margin-top:2px}
+.conv .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+button{font-family:inherit;font-size:12.5px;cursor:pointer;border-radius:6px;padding:5px 11px;
+  border:1px solid var(--line);background:var(--surface);color:var(--muted);font-weight:500}
+button:hover{color:var(--ink);border-color:var(--muted)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--paper);font-weight:700}
+button.primary:hover{filter:brightness(1.12);color:var(--paper)}
+.empty{color:var(--faint);font-size:13px;padding:18px 0;text-align:center}
+.foot{margin-top:14px;padding-top:11px;border-top:1px solid var(--line);
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.note{font-size:11.5px;color:var(--faint);flex:1;min-width:140px}
+.ok{color:var(--accent)}
+</style>
+</head>
+<body>
+  <h1>判斷紀錄 擷取器</h1>
+  <div class="sub">Judgment Log Capture</div>
+  <div class="status" id="status">讀取中…</div>
+  <div class="status" id="send"></div>
+  <div id="codebox" hidden style="margin-top:8px;display:flex;gap:6px">
+    <input id="codein" placeholder="JL-XXXX-XXXX-XXXX" spellcheck="false"
+      autocomplete="off" autocorrect="off" autocapitalize="characters"
+      style="flex:1;font:inherit;font-size:12.5px;letter-spacing:.04em;padding:5px 9px;
+             border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink)">
+    <button id="setcode" class="primary">啟用</button>
+  </div>
+  <div class="row" style="display:flex;gap:6px;margin-top:10px">
+    <button id="diag">檢查這一頁抓到什麼</button>
+  </div>
+  <pre id="diagout" hidden style="margin-top:8px;padding:9px 11px;background:var(--surface);
+    border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:11px;
+    line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:220px;
+    overflow:auto;color:var(--ink-2)"></pre>
+  <div class="list" id="list"></div>
+  <div class="foot">
+    <span class="note" id="note"></span>
+    <button id="clearcode">移除代碼</button>
+    <button id="clearowner">切換使用者</button>
+    <button id="clear">全部清除</button>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

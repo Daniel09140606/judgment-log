@@ -1,0 +1,322 @@
+<title>判斷紀錄 安裝指南</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#F4F5F3; --surface:#FFFFFF; --surface-2:#FAFBF9;
+  --ink:#14201C; --ink-2:#3E4B45; --muted:#6B7770; --faint:#9AA5A0;
+  --line:#DCDFDA; --line-2:#E9EBE7;
+  --accent:#0F5C4A; --accent-soft:#E4EFEA;
+  --warn:#B06A16; --warn-soft:#FBF3E7;
+  --serif:"Noto Serif TC",Songti TC,Georgia,serif;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0E1512; --surface:#161E1A; --surface-2:#131B17;
+  --ink:#E8EDE9; --ink-2:#C2CCC6; --muted:#8FA098; --faint:#6B7972;
+  --line:#27322D; --line-2:#202A25;
+  --accent:#4FBFA0; --accent-soft:#17302A;
+  --warn:#D4913F; --warn-soft:#241B0F;
+}}
+:root[data-theme="dark"]{
+  --paper:#0E1512; --surface:#161E1A; --surface-2:#131B17;
+  --ink:#E8EDE9; --ink-2:#C2CCC6; --muted:#8FA098; --faint:#6B7972;
+  --line:#27322D; --line-2:#202A25;
+  --accent:#4FBFA0; --accent-soft:#17302A;
+  --warn:#D4913F; --warn-soft:#241B0F;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased;
+  padding:0 20px;padding-block:0 76px}
+.wrap{max-width:680px;margin:0 auto}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+a{color:var(--accent);text-underline-offset:3px}
+b,strong{font-weight:700}
+code{font-family:var(--mono);font-size:.9em;background:var(--surface);
+  border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+  word-break:break-all}
+
+/* 開頭 */
+.top{padding-block:46px 30px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--faint)}
+h1{font-family:var(--serif);font-weight:700;letter-spacing:.05em;
+  font-size:clamp(29px,6.5vw,40px);line-height:1.2;margin-top:8px;text-wrap:balance}
+.sub{color:var(--ink-2);margin-top:14px;max-width:34em}
+.mins{display:flex;gap:18px;flex-wrap:wrap;margin-top:18px;
+  font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+/* 為什麼要做這個 */
+.why{margin-top:10px}
+.why p{color:var(--ink-2);margin-top:13px;max-width:35em}
+.why .lede{font-family:var(--serif);font-weight:600;color:var(--ink);
+  font-size:clamp(19px,4vw,24px);line-height:1.5;margin-top:18px;text-wrap:balance}
+.why .ask{margin-top:20px;padding:13px 16px;background:var(--surface);
+  border:1px solid var(--line);border-radius:9px;font-size:14.5px;color:var(--ink-2)}
+.why .ask b{color:var(--ink)}
+
+/* 需要什麼 */
+.need{margin-top:30px;display:grid;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.need div{background:var(--surface);padding:13px 16px;display:flex;gap:12px;
+  align-items:baseline;font-size:14.5px}
+.need dt{font-family:var(--mono);font-size:11.5px;color:var(--faint);
+  flex:none;width:4.5em;letter-spacing:.06em}
+.need dd{color:var(--ink-2)}
+
+/* 步驟 */
+h2{font-family:var(--serif);font-weight:600;font-size:20px;letter-spacing:.03em;
+  margin-top:52px;padding-bottom:9px;border-bottom:1px solid var(--line)}
+ol.steps{list-style:none;margin-top:8px}
+.step{display:grid;grid-template-columns:38px 1fr;gap:0 16px;
+  padding-block:26px;border-bottom:1px solid var(--line-2)}
+.step:last-child{border-bottom:0}
+.n{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--accent);
+  padding-top:3px;font-variant-numeric:tabular-nums}
+.step h3{font-size:16.5px;font-weight:700;line-height:1.55;text-wrap:balance}
+.step p{color:var(--ink-2);margin-top:7px}
+.step ul{margin-top:9px;padding-left:19px;color:var(--ink-2)}
+.step li{margin-top:5px}
+.step > .body{min-width:0}
+
+/* 檢查點 */
+.check{margin-top:13px;background:var(--accent-soft);border-left:3px solid var(--accent);
+  border-radius:0 7px 7px 0;padding:10px 14px;font-size:14px;color:var(--ink-2)}
+.check b{color:var(--ink);display:block;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.16em;text-transform:uppercase;margin-bottom:3px;font-weight:500;
+  color:var(--accent)}
+.warnbox{margin-top:13px;background:var(--warn-soft);border-left:3px solid var(--warn);
+  border-radius:0 7px 7px 0;padding:10px 14px;font-size:14px;color:var(--ink-2)}
+.warnbox b{color:var(--warn)}
+
+/* 疑難排解 */
+.fix{margin-top:8px}
+.fix > div{padding-block:16px;border-bottom:1px solid var(--line-2)}
+.fix > div:last-child{border-bottom:0}
+.fix h3{font-size:15px;font-weight:700;color:var(--ink)}
+.fix p{color:var(--ink-2);font-size:14.5px;margin-top:5px}
+
+/* 誠實說明 */
+.honest{margin-top:16px;border:1px dashed var(--line);border-radius:11px;
+  padding:8px 20px 22px}
+.honest h3{font-size:15px;font-weight:700;margin-top:18px}
+.honest p{color:var(--ink-2);font-size:14.5px;margin-top:5px}
+.honest ul{margin-top:7px;padding-left:19px;color:var(--ink-2);font-size:14.5px}
+.honest li{margin-top:4px}
+
+.foot{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);
+  font-size:13px;color:var(--faint)}
+
+@media (max-width:430px){
+  .step{grid-template-columns:1fr;gap:0}
+  .n{padding-top:0;margin-bottom:4px}
+}
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="eyebrow">Judgment Log · Setup</div>
+    <h1>判斷紀錄 安裝指南</h1>
+    <p class="sub">把你使用 AI 的過程，變成你的能力證明。
+      照著做，你跟 AI 的每一輪對話會在發生的當下被記下來。全部七步，大約十分鐘。</p>
+    <div class="mins">
+      <span>約 10 分鐘</span>
+      <span>需要 Chrome</span>
+      <span>桌機或筆電</span>
+    </div>
+  </header>
+
+  <h2>為什麼要做這個</h2>
+  <div class="why">
+    <p>現在幾乎每一份報告、專題、甚至履歷，AI 都有參與。結果是成績單和作品<b>同時</b>失去了可信度——
+      老師沒辦法從成果看出你到底學到什麼，你自己被追問的時候也講不太清楚。</p>
+
+    <p>現有的做法都在處理另一個問題：AI 偵測工具在證明「你沒有用」，閉卷考在避開它，
+      學習歷程檔案只收成果。但成果 AI 生得出來。</p>
+
+    <p class="lede">生不出來的是判斷。</p>
+
+    <p>哪一段你照單全收，哪一段你推回去要它先給出處，哪一段你直接否決另找做法，以及為什麼。
+      這些只存在於過程裡——事後補寫不出來，也不是 AI 能代勞的。
+      老師課堂上追問你的，其實一直都是這個。</p>
+
+    <p>所以這套系統<b>不證明你沒用 AI</b>。它把你使用 AI 的過程在當下記下來，
+      讓「你做了哪些判斷」變成看得見、拿得出來的東西——給老師看，
+      也給四年後要去面試、卻發現手上只有成績單的你自己看。</p>
+
+    <div class="ask"><b>現在需要你幫的忙：</b>裝起來，然後照常做你本來就要做的事。
+      不用改變任何習慣，也不用配合演出。<b>用得不順、覺得哪裡怪、或是根本忘記它存在</b>——
+      這些都是有用的回饋，直接說就好。</div>
+  </div>
+
+  <h2>開始之前</h2>
+  <div class="need">
+    <div><dt>瀏覽器</dt><dd><b>Chrome</b>。Edge、Safari、Firefox 都不行——外掛只裝得進 Chrome。</dd></div>
+    <div><dt>裝置</dt><dd>桌機或筆電。<b>手機不行</b>，手機版 Chrome 不支援擴充功能。</dd></div>
+    <div><dt>檔案</dt><dd>一個叫 <code>judgment-capture</code> 的資料夾（壓縮檔）。跟給你這份說明的人要。</dd></div>
+    <div><dt>網站</dt><dd><a href="../index.html">判斷紀錄網站</a>（跟這份指南放在一起，開 index.html 就是）</dd></div>
+  </div>
+
+  <h2>安裝步驟</h2>
+  <ol class="steps">
+
+    <li class="step">
+      <div class="n">01</div>
+      <div class="body">
+        <h3>把資料夾解壓縮，放在不會刪掉的地方</h3>
+        <p>例如「文件」資料夾。<b>不要放在下載資料夾然後忘記</b>——Chrome 是直接讀這個資料夾在跑的，
+          資料夾被刪或被搬走，外掛就會停止運作。</p>
+        <div class="warnbox"><b>常見錯誤</b>
+          有些解壓縮軟體會產生兩層同名資料夾（<code>judgment-capture\judgment-capture</code>）。
+          等一下要選的是<b>裡面有 <code>manifest.json</code> 的那一層</b>。</div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="n">02</div>
+      <div class="body">
+        <h3>在 Chrome 裡載入外掛</h3>
+        <ul>
+          <li>網址列輸入 <code>chrome://extensions</code> 按 Enter（這個要用打的，點連結沒有用）</li>
+          <li>右上角打開<b>開發人員模式</b></li>
+          <li>左上角按<b>載入未封裝項目</b>，選第 1 步那個資料夾</li>
+          <li>按網址列旁的<b>拼圖圖示</b>，把「判斷紀錄 擷取器」用圖釘固定到工具列</li>
+        </ul>
+        <div class="check"><b>你應該看到</b>
+          擴充功能清單裡出現「判斷紀錄 擷取器」，版本 0.5.0，而且工具列上有它的圖示。</div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="n">03</div>
+      <div class="body">
+        <h3>註冊一個帳號</h3>
+        <p>打開<a href="../index.html">判斷紀錄網站</a>，
+          按「開始使用」，身分選<b>學生</b>，填名字、Email、密碼。
+          名字是老師在班級名單上看到的，用真名。</p>
+        <p>註冊完會收到一封確認信，點裡面的連結之後才能登入。</p>
+        <div class="check"><b>如果你已經有帳號</b>
+          （例如你在另一台電腦用過）就按「我已經有帳號，直接登入」，不要重新註冊。
+          同一個帳號在不同電腦上看到的是同一份紀錄。</div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="n">04</div>
+      <div class="body">
+        <h3>確認外掛認得你</h3>
+        <p>保持網站登入狀態，點工具列上的外掛圖示。</p>
+        <div class="check"><b>你應該看到</b>
+          最上面寫著「<b>目前歸屬：你的名字</b>」。</div>
+        <p>沒看到就先別繼續用。外掛不知道你是誰的時候，擷取到的東西會扣在你自己電腦裡不送出去，
+          不會亂算到別人頭上——但也不會進到你的紀錄裡。</p>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="n">05</div>
+      <div class="body">
+        <h3>發一組匯入代碼</h3>
+        <p>在網站上按右上角<b>設定</b>，展開「<b>匯入代碼</b>」，按「發一組新代碼」。</p>
+        <p>沒有這一步也能用，但你必須讓網站那一頁一直開著，資料才送得上去。
+          發了代碼之後，網站關著也會自己送。</p>
+        <div class="check"><b>你應該看到</b>
+          回到外掛視窗，第二格從「直送未開」變成「<b>直送已開</b>」。</div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="n">06</div>
+      <div class="body">
+        <h3>照常用 AI</h3>
+        <p>去 <b>ChatGPT</b>、<b>claude.ai</b> 或 <b>Gemini</b> 做你本來就要做的事。
+          不用改變任何習慣，也不用記得按什麼。</p>
+        <div class="check"><b>你應該看到</b>
+          畫面右下角會閃一下「判斷紀錄：已擷取 N 輪」。回到判斷紀錄網站，紀錄會自己出現，
+          <b>不用重新整理</b>。</div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="n">07</div>
+      <div class="body">
+        <h3>加入課程（老師有給代碼才需要）</h3>
+        <p>在網站的「課程」那一區輸入老師給的代碼，按「加入課程」。</p>
+        <p>加入之後，老師<b>還是看不到任何東西</b>。要讓某一份紀錄給老師看，
+          你必須自己把它標成「課程作業」並掛到那門課底下。
+          沒做這兩件事的紀錄，老師在資料庫那一層就查不到。</p>
+      </div>
+    </li>
+
+  </ol>
+
+  <h2>遇到問題</h2>
+  <div class="fix">
+    <div>
+      <h3>對話沒有被記錄到</h3>
+      <p>最常見的原因是外掛剛安裝或剛更新，而對話分頁是更新前就開著的。
+        <b>把那個對話分頁按 F5 重新整理</b>，八成就好了。</p>
+    </div>
+    <div>
+      <h3>畫面上跳出「Extension context invalidated」</h3>
+      <p>同一個原因，同一個解法：重新整理那個分頁。這是舊的程式還留在分頁裡在喊，不是壞掉。</p>
+    </div>
+    <div>
+      <h3>外掛說「還沒指定歸屬」</h3>
+      <p>判斷紀錄網站沒有登入，或登入的分頁已經關掉太久。打開網站確認是登入狀態，回外掛再看一次。</p>
+    </div>
+    <div>
+      <h3>某個網站抓不到內容</h3>
+      <p>停在那一頁，點外掛圖示按「<b>檢查這一頁抓到什麼</b>」，把顯示的內容截圖給開發的人。
+        AI 網站改版就會發生這件事，不是你的問題。</p>
+    </div>
+    <div>
+      <h3>共用電腦，用完要做什麼</h3>
+      <p>在網站按<b>登出</b>，或點外掛圖示按<b>切換使用者</b>。
+        兩個都會清掉歸屬和代碼。<b>只關掉分頁不算。</b></p>
+    </div>
+  </div>
+
+  <h2>這個東西會記什麼</h2>
+  <div class="honest">
+
+    <h3>會記</h3>
+    <p>你在 ChatGPT、claude.ai、Gemini 上打的字，AI 回覆的原文，以及發生的時間。</p>
+
+    <h3>不會記</h3>
+    <ul>
+      <li>其他網站。外掛只在上面那三個網域上運作。</li>
+      <li>你的帳號密碼。外掛不持有任何帳號或金鑰。</li>
+      <li>你登入之前擷取到的東西，那些永遠標成「未指定歸屬」，不會自動變成你的。</li>
+    </ul>
+
+    <h3>誰看得到</h3>
+    <p>預設只有你。老師只看得到<b>同時滿足兩個條件</b>的紀錄：你把它標成「課程作業」，
+      而且掛到他的課底下。這兩件事都在你手上。</p>
+    <p>而且老師每展開一次 AI 原文，<b>你在自己的頁面上都看得到他展開過幾次</b>。</p>
+
+    <h3>你可以改的</h3>
+    <ul>
+      <li>分類：這份紀錄屬於哪一類、算不算課程作業</li>
+      <li>被標記時補的那一句說明</li>
+      <li>整份丟進垃圾桶，14 天內可以還原，之後才真的刪除</li>
+      <li>隨時撤銷匯入代碼，撤銷的下一秒就失效</li>
+    </ul>
+
+    <h3>你不能改的</h3>
+    <p>對話原文和發生時間。寫進去之後誰都改不了，包括你自己。</p>
+    <p>這不是限制，這是這套系統唯一的意義——能被本人修改的紀錄，拿去證明什麼都沒有重量。</p>
+
+    <h3>不想用了</h3>
+    <p>到 <code>chrome://extensions</code> 把外掛移除，擷取立刻停止。
+      已經上傳的紀錄，在網站上一份一份丟進垃圾桶就會刪掉。</p>
+
+  </div>
+
+  <p class="foot">判斷紀錄是元智大學元創盃的參賽作品。安裝過程有任何卡住的地方，
+    直接把畫面截圖給你拿到這份說明的人——卡住通常是我們的問題，不是你的。</p>
+
+</div>

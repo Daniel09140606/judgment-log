@@ -1,0 +1,347 @@
+<title>為什麼要做判斷紀錄</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#F4F5F3; --surface:#FFFFFF; --surface-2:#FAFBF9;
+  --ink:#14201C; --ink-2:#3E4B45; --muted:#6B7770; --faint:#9AA5A0;
+  --line:#DCDFDA; --line-2:#E9EBE7;
+  --accent:#0F5C4A; --accent-soft:#E4EFEA;
+  --adopt:#B06A16; --push:#0F5C4A; --reject:#3C5A99; --choose:#6B7770;
+  --serif:"Noto Serif TC",Songti TC,Georgia,serif;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0E1512; --surface:#161E1A; --surface-2:#131B17;
+  --ink:#E8EDE9; --ink-2:#C2CCC6; --muted:#8FA098; --faint:#6B7972;
+  --line:#27322D; --line-2:#202A25;
+  --accent:#4FBFA0; --accent-soft:#17302A;
+  --adopt:#D4913F; --push:#4FBFA0; --reject:#8FAEE8; --choose:#8FA098;
+}}
+:root[data-theme="dark"]{
+  --paper:#0E1512; --surface:#161E1A; --surface-2:#131B17;
+  --ink:#E8EDE9; --ink-2:#C2CCC6; --muted:#8FA098; --faint:#6B7972;
+  --line:#27322D; --line-2:#202A25;
+  --accent:#4FBFA0; --accent-soft:#17302A;
+  --adopt:#D4913F; --push:#4FBFA0; --reject:#8FAEE8; --choose:#8FA098;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15.5px;line-height:1.78;-webkit-font-smoothing:antialiased;
+  padding:0 20px;padding-block:0 80px}
+.wrap{max-width:700px;margin:0 auto}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+a{color:var(--accent);text-underline-offset:3px}
+p{margin-top:14px;color:var(--ink-2);max-width:36em}
+p b,li b{color:var(--ink)}
+
+.top{padding-block:48px 32px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--faint)}
+h1{font-family:var(--serif);font-weight:700;letter-spacing:.05em;
+  font-size:clamp(30px,6.5vw,42px);line-height:1.22;margin-top:9px;text-wrap:balance}
+.top p{margin-top:15px}
+.meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:20px;
+  font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+
+h2{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:.03em;
+  margin-top:54px;padding-bottom:10px;border-bottom:1px solid var(--line);text-wrap:balance}
+h3{font-size:16px;font-weight:700;margin-top:26px}
+
+.thesis{margin-top:22px;padding:20px 24px;background:var(--surface);
+  border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 11px 11px 0}
+.thesis .big{font-family:var(--serif);font-weight:600;color:var(--ink);
+  font-size:clamp(20px,4vw,26px);line-height:1.5;text-wrap:balance}
+.thesis p{margin-top:10px;font-size:14.5px}
+
+.verdicts{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:10px;overflow:hidden;margin-top:18px}
+.verdicts > div{background:var(--surface);padding:13px 16px;display:flex;gap:12px;
+  align-items:baseline;flex-wrap:wrap}
+.verdicts i{width:8px;height:8px;border-radius:99px;flex:none;translate:0 -1px}
+.verdicts b{font-size:14.5px;flex:none;width:5.5em}
+.verdicts span{font-size:14px;color:var(--muted);flex:1;min-width:180px}
+
+figure{margin-top:24px}
+figure svg{width:100%;max-width:100%;height:auto;display:block}
+figcaption{margin-top:12px;font-size:13.5px;color:var(--muted);line-height:1.65}
+
+.tablewrap{overflow-x:auto;margin-top:20px;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+th,td{text-align:left;padding:12px 15px;border-bottom:1px solid var(--line-2);
+  vertical-align:top;color:var(--ink-2)}
+thead th{background:var(--surface-2);color:var(--ink);font-weight:700;font-size:13px;
+  border-bottom:1px solid var(--line)}
+tbody th{font-weight:500;color:var(--muted);font-size:13px;white-space:nowrap}
+tr:last-child td,tr:last-child th{border-bottom:0}
+td.us{background:var(--accent-soft);color:var(--ink)}
+thead th.us{background:var(--accent);color:var(--paper)}
+
+ul{margin-top:12px;padding-left:20px;color:var(--ink-2)}
+li{margin-top:7px}
+li::marker{color:var(--faint)}
+
+.uses{display:grid;gap:14px;margin-top:20px}
+.use{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:15px 18px}
+.use h3{margin-top:0;font-size:15px}
+.use p{margin-top:6px;font-size:14.5px}
+.use .q{display:block;margin-top:9px;font-family:var(--serif);color:var(--ink);
+  font-size:15px;line-height:1.6;padding-left:13px;border-left:2px solid var(--line)}
+
+.limits{margin-top:18px;border:1px dashed var(--line);border-radius:11px;padding:6px 20px 20px}
+.limits h3{font-size:15px}
+.limits p{font-size:14.5px}
+
+.status{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:10px;overflow:hidden;margin-top:18px}
+.status > div{background:var(--surface);padding:12px 16px;display:flex;gap:14px;
+  align-items:baseline;font-size:14.5px}
+.status dt{font-family:var(--mono);font-size:11px;color:var(--faint);flex:none;width:4.2em;
+  letter-spacing:.06em}
+.status dd{color:var(--ink-2)}
+
+.foot{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);
+  font-size:13px;color:var(--faint)}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">判斷紀錄 · Judgment Log</div>
+  <h1>為什麼要做判斷紀錄</h1>
+  <p>生成式 AI 已經參與大學生的每一份報告、專題甚至履歷。
+    成績單和作品<b>同時</b>失去了可信度——老師沒辦法從成果看出學生學到什麼，
+    學生自己被追問的時候也講不清楚。這份文件說明我們打算怎麼處理這件事，
+    以及我們知道自己還做不到什麼。</p>
+  <div class="meta">
+    <span>元智大學 元創盃參賽作品</span>
+    <span>2026 年 9 月</span>
+  </div>
+</header>
+
+<h2>一、這個題目是從哪裡來的</h2>
+
+<p>不是從「學生會不會作弊」來的，是從<b>兩個具體的時刻</b>來的。</p>
+
+<p><b>第一個時刻在課堂上。</b>我上學期的自主學習報告，內容大約八成的想法來自 AI。
+  我會把 AI 給的東西用自己的話重寫一次再丟回去確認，所以我不是完全不知道自己在寫什麼。
+  但老師課堂上額外追問的時候，有些我答得上來、自認答得不好，<b>有些我根本不知道怎麼回答</b>。</p>
+
+<p><b>第二個時刻在大四。</b>要去求職了，手上能證明自己學到什麼的東西，只有一張成績單和幾份作品。
+  而那些作品，AI 現在都生得出來。</p>
+
+<p>這兩件事其實是同一件：<b>我做得出成果，但我拿不出「我真的參與過」的證據。</b>
+  而且這不只是我——身邊有朋友只讓 AI 想架構、不讓它生內容，因為怕上台講不出來；
+  也有一部分同學覺得沒差、會過就好。<b>在意的人自己在亂劃界線，沒人教，也沒地方檢驗自己有沒有真的懂。</b></p>
+
+<h2>二、核心主張</h2>
+
+<div class="thesis">
+  <div class="big">成品可以被生出來，判斷不行。</div>
+  <p>所以我們不去證明學生沒有用 AI。我們記錄他在用 AI 的<b>當下</b>做了哪些判斷，
+    讓「判斷」這件本來只存在於過程裡、事後補不出來的東西，變成看得見、拿得出來的證據。</p>
+</div>
+
+<h3>它把每一輪對話分成四種</h3>
+
+<div class="verdicts">
+  <div><i style="background:var(--push)"></i><b>有推回去</b>
+    <span>質疑、要求出處、指出問題，讓 AI 修正</span></div>
+  <div><i style="background:var(--reject)"></i><b>否決不用</b>
+    <span>不採用它的建議，自己另找做法</span></div>
+  <div><i style="background:var(--choose)"></i><b>做了選擇</b>
+    <span>在幾個方案裡挑了一個</span></div>
+  <div><i style="background:var(--adopt)"></i><b>照單全收</b>
+    <span>直接採用。<b>只有這一種會被要求補一句「為什麼接受它」</b></span></div>
+</div>
+
+<p>判定由 AI 逐段做，不是學生自己標——自己標就等於自己給自己打分數。
+  被標成「照單全收」的那幾段，學生要補一句說明；那句話可以修改，
+  但<b>修改過幾次、最後改於何時，都會顯示出來</b>。</p>
+
+<h2>三、市面上已經有什麼</h2>
+
+<p>必須先說清楚：<b>「記錄過程而不是成果」這個方向，不是我們發明的。</b>
+  已經有兩個做得很好的產品在做，而且都有學校通路。</p>
+
+<p><a href="https://www.turnitin.com/products/feedback-studio/clarity" target="_blank" rel="noopener">Turnitin&nbsp;Clarity</a>
+  記草稿歷程、寫作時間、貼上的文字比例，老師看得到整份作業怎麼成形的。
+  <a href="https://www.grammarly.com/edu/authorship" target="_blank" rel="noopener">Grammarly&nbsp;Authorship</a>
+  把文字分成自己寫的、AI 生成的、複製來的，用顏色標示，還可以重播整份作業長出來的過程。</p>
+
+<p>我們跟它們的差別不在「有沒有看過程」，而在<b>看的是哪一段過程</b>。</p>
+
+<div class="tablewrap">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col"></th>
+        <th scope="col">Turnitin Clarity<br>Grammarly Authorship</th>
+        <th scope="col" class="us">判斷紀錄</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">回答的問題</th>
+        <td>這篇有多少是 AI 寫的？</td>
+        <td class="us">他在哪裡推回去？為什麼？</td></tr>
+      <tr><th scope="row">觀察的位置</th>
+        <td>文件（編輯器、打字的地方）</td>
+        <td class="us">對話（AI 網站本身）</td></tr>
+      <tr><th scope="row">給老師的輸出</th>
+        <td>比例、顏色標示、歷程重播</td>
+        <td class="us">可以追問學生的具體問題</td></tr>
+      <tr><th scope="row">誰是使用者</th>
+        <td>學校與老師，學生是被檢查的一方</td>
+        <td class="us">學生，老師是受益的一方</td></tr>
+      <tr><th scope="row">學生的控制權</th>
+        <td>由學校部署，學生無從選擇</td>
+        <td class="us">學生決定哪一份給老師看，但不能決定哪一段存不存在</td></tr>
+      <tr><th scope="row">老師看了之後</th>
+        <td>學生不會知道</td>
+        <td class="us">學生看得到自己的紀錄被查閱過</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>四、關鍵的那一個差別</h2>
+
+<p>上面那張表裡最重要的一列是「觀察的位置」。原因是這個：</p>
+
+<figure>
+  <svg viewBox="0 0 680 330" role="img"
+    aria-label="學生與 AI 的五輪對話中，被採用的三輪流入交出去的文件，被推回去與否決的兩輪沒有進入文件。判斷紀錄觀察對話那一側，Turnitin 與 Grammarly 觀察文件那一側。">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+      </marker>
+    </defs>
+
+    <text x="20" y="26" font-size="13" font-weight="700" fill="currentColor">你跟 AI 的對話</text>
+    <text x="470" y="26" font-size="13" font-weight="700" fill="currentColor">你交出去的文件</text>
+
+    <!-- 五輪對話 -->
+    <rect x="20" y="44" width="186" height="34" rx="6" fill="none" stroke="currentColor" stroke-opacity=".3"/>
+    <text x="34" y="66" font-size="12.5" fill="currentColor">第 1 輪 · 照單全收</text>
+
+    <rect x="20" y="90" width="186" height="34" rx="6" fill="none"
+      stroke="var(--push)" stroke-width="1.6"/>
+    <text x="34" y="112" font-size="12.5" fill="currentColor">第 2 輪 · 有推回去</text>
+
+    <rect x="20" y="136" width="186" height="34" rx="6" fill="none" stroke="currentColor" stroke-opacity=".3"/>
+    <text x="34" y="158" font-size="12.5" fill="currentColor">第 3 輪 · 照單全收</text>
+
+    <rect x="20" y="182" width="186" height="34" rx="6" fill="none"
+      stroke="var(--reject)" stroke-width="1.6"/>
+    <text x="34" y="204" font-size="12.5" fill="currentColor">第 4 輪 · 否決不用</text>
+
+    <rect x="20" y="228" width="186" height="34" rx="6" fill="none" stroke="currentColor" stroke-opacity=".3"/>
+    <text x="34" y="250" font-size="12.5" fill="currentColor">第 5 輪 · 照單全收</text>
+
+    <!-- 文件 -->
+    <rect x="470" y="44" width="190" height="218" rx="8" fill="none" stroke="currentColor" stroke-opacity=".45"/>
+    <line x1="492" y1="80" x2="638" y2="80" stroke="currentColor" stroke-opacity=".25" stroke-width="6"/>
+    <line x1="492" y1="104" x2="612" y2="104" stroke="currentColor" stroke-opacity=".25" stroke-width="6"/>
+    <line x1="492" y1="152" x2="638" y2="152" stroke="currentColor" stroke-opacity=".25" stroke-width="6"/>
+    <line x1="492" y1="176" x2="586" y2="176" stroke="currentColor" stroke-opacity=".25" stroke-width="6"/>
+    <line x1="492" y1="224" x2="626" y2="224" stroke="currentColor" stroke-opacity=".25" stroke-width="6"/>
+
+    <!-- 有進到文件的 -->
+    <line x1="212" y1="61" x2="462" y2="61" stroke="currentColor" stroke-opacity=".45"
+      marker-end="url(#ar)" color="currentColor"/>
+    <line x1="212" y1="153" x2="462" y2="153" stroke="currentColor" stroke-opacity=".45"
+      marker-end="url(#ar)"/>
+    <line x1="212" y1="245" x2="462" y2="245" stroke="currentColor" stroke-opacity=".45"
+      marker-end="url(#ar)"/>
+
+    <!-- 沒進到文件的 -->
+    <line x1="212" y1="107" x2="300" y2="107" stroke="var(--faint)" stroke-dasharray="4 4"/>
+    <line x1="306" y1="101" x2="318" y2="113" stroke="var(--faint)" stroke-width="1.8"/>
+    <line x1="318" y1="101" x2="306" y2="113" stroke="var(--faint)" stroke-width="1.8"/>
+    <line x1="212" y1="199" x2="300" y2="199" stroke="var(--faint)" stroke-dasharray="4 4"/>
+    <line x1="306" y1="193" x2="318" y2="205" stroke="var(--faint)" stroke-width="1.8"/>
+    <line x1="318" y1="193" x2="306" y2="205" stroke="var(--faint)" stroke-width="1.8"/>
+    <text x="330" y="112" font-size="12" fill="var(--faint)">沒有進到文件</text>
+    <text x="330" y="204" font-size="12" fill="var(--faint)">沒有進到文件</text>
+
+    <!-- 兩邊各看哪裡 -->
+    <path d="M 20 278 L 20 288 L 206 288 L 206 278" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="20" y="310" font-size="12.5" font-weight="700" fill="var(--accent)">判斷紀錄看這裡</text>
+
+    <path d="M 470 278 L 470 288 L 660 288 L 660 278" fill="none" stroke="currentColor" stroke-opacity=".45"/>
+    <text x="470" y="310" font-size="12.5" fill="currentColor">Turnitin / Grammarly 看這裡</text>
+  </svg>
+  <figcaption><b>被否決的那幾輪，永遠不會進到文件裡。</b>
+    你要求 AI 先給出處、你發現它的數字是推估的、你決定不用它的做法——
+    這些都沒有留下任何一個字在交出去的檔案上。看文件的工具，結構上就看不到它們，
+    而那正是判斷發生的地方。</figcaption>
+</figure>
+
+<h2>五、有什麼用</h2>
+
+<div class="uses">
+  <div class="use">
+    <h3>對老師：拿到的是問題，不是分數</h3>
+    <p>系統會從紀錄本身的缺口長出可以追問的問題，例如：</p>
+    <span class="q">「第 1、6 段是照單全收，也沒有留下說明。當時你怎麼確認那段內容是對的？」</span>
+    <span class="q">「第 6 段 AI 給了很長一段而你整段採用。這裡面你最有把握的是哪一句、最沒把握的是哪一句？」</span>
+    <p>老師不用當偵探，也不用讀完全部原文。<b>能不能當場答得出來，才是 AI 代替不了的部分。</b></p>
+  </div>
+
+  <div class="use">
+    <h3>對學生：一個可以拿出去的東西</h3>
+    <p>不是分數，是具體的判斷時刻——「我要求它給出處，它承認那個 37% 是推估的」。
+      這種東西寫得進履歷、講得進面試，而且是真的發生過。</p>
+    <p>另外還有一張四年的形狀：哪一天有紀錄、有幾段。
+      密集的期末、空白的寒假、某個專題那兩週的爆量。<b>擷取時間寫進去就改不了，所以這個形狀補不出來。</b></p>
+  </div>
+
+  <div class="use">
+    <h3>對系所：一個不必靠抓的做法</h3>
+    <p>現在的討論多半停在防弊——偵測、閉卷、禁止。這些都在證明「你沒有用」，
+      而學生真正的問題是「用了，但不知道自己有沒有學到」。
+      這套系統換一個方向：<b>不禁止使用，而是讓使用的過程本身變成可以被檢驗的東西。</b></p>
+  </div>
+</div>
+
+<h2>六、我們知道它做不到什麼</h2>
+
+<div class="limits">
+  <h3>想作弊的人不會裝</h3>
+  <p>所有的完整性保證，只對願意裝的人生效。Turnitin 是學校強制、綁在繳交流程上，我們不是。
+    <b>所以這不是防弊工具</b>，把它當防弊工具用一定會失望。它的價值是給誠實的人一個能拿出來的東西。</p>
+
+  <h3>紀錄是被評判的那一方寫的</h3>
+  <p>擷取發生在學生自己的瀏覽器裡。我們把原文與時間在資料庫層鎖死——寫進去之後
+    <b>連紀錄的擁有者本人都改不了</b>——但這擋不住一開始就不記錄的人。</p>
+
+  <h3>判定靠模型，模型會錯</h3>
+  <p>「照單全收」還是「有推回去」是 AI 判的，會有誤判。所以它被設計成
+    <b>引發追問的線索，不是評分的依據</b>。學生也能對被標記的段落補充說明。</p>
+
+  <h3>擷取讀的是畫面，網站改版就會壞</h3>
+  <p>目前支援 ChatGPT、Claude、Gemini 三個網站。正式版應該做傳輸層攔截或接平台官方 API，
+    才不會每次對方改版就失效。</p>
+
+  <h3>稽核紀錄本身也刪得掉</h3>
+  <p>「老師查閱過」這件事記在同一個資料庫裡，握有最高權限的人可以刪掉自己的足跡。
+    <b>在單一資料庫裡，「可稽核」有天花板。</b>要真的防住，稽核紀錄必須放在當事人碰不到的地方。</p>
+</div>
+
+<h2>七、現在到哪裡了</h2>
+
+<div class="status">
+  <div><dt>能用了</dt><dd>擷取外掛（三個 AI 網站）、獨立網站、帳號與權限隔離、
+    AI 逐段判讀、學生端分類與檢視、老師端班級檢視與追問建議、四年的形狀</dd></div>
+  <div><dt>做完了</dt><dd>原文與時間不可修改（資料庫層強制）、老師查閱留痕給學生看、
+    只能寫不能讀的授權機制</dd></div>
+  <div><dt>下一步</dt><dd>找同學實際使用並回收意見、與老師訪談、問卷驗證需求</dd></div>
+  <div><dt>還沒做</dt><dd>代表作挑選、提問型態的長期變化、領域地圖、可對外驗證的唯讀連結</dd></div>
+</div>
+
+<p class="foot">判斷紀錄 · 元智大學元創盃參賽作品。
+  這份文件裡關於競品的描述來自 Turnitin 與 Grammarly 的官方產品頁面，2026 年 9 月查閱。</p>
+
+</div>
