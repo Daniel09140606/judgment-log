@@ -1,0 +1,18 @@
+# service_role key 或任何私鑰，永遠不要進版本庫
+.env
+.env.*
+*.key
+secrets.*
+config.local.js
+
+# 匯出的個人紀錄（裡面是真實對話內容）
+judgment-export*.json
+
+# 作業系統與編輯器
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+node_modules/

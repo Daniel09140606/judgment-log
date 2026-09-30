@@ -1,0 +1,1886 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>判斷紀錄 Judgment Log</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#F4F5F3; --surface:#FFFFFF; --surface-2:#FAFBF9;
+  --ink:#14201C; --ink-2:#3E4B45; --muted:#6B7770; --faint:#9AA5A0;
+  --line:#DCDFDA; --line-2:#E9EBE7;
+  --accent:#0F5C4A; --accent-soft:#E4EFEA;
+  --adopt:#B06A16; --push:#0F5C4A; --reject:#3C5A99; --choose:#6B7770; --none:#B6BEB9;
+  --grid:rgba(20,32,28,.085);
+  --cal0:#E9EBE7; --cal1:#BCD8CB; --cal2:#8CBFAE; --cal3:#4E9380; --cal4:#0F5C4A;
+  --serif:"Noto Serif TC",Songti TC,SimSun,Georgia,serif;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0E1512; --surface:#161E1A; --surface-2:#131B17;
+  --ink:#E8EDE9; --ink-2:#C2CCC6; --muted:#8FA098; --faint:#6B7972;
+  --line:#27322D; --line-2:#202A25;
+  --accent:#4FBFA0; --accent-soft:#17302A;
+  --adopt:#D4913F; --push:#4FBFA0; --reject:#8FAEE8; --choose:#8FA098; --none:#4A5852;
+  --grid:rgba(232,237,233,.07);
+  --cal0:#202A25; --cal1:#22483C; --cal2:#2E6E59; --cal3:#3C9A7C; --cal4:#4FBFA0;
+}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;
+  line-height:1.7;padding:0 20px 72px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto}
+h1,h2{text-wrap:balance}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+a{color:var(--accent)}
+
+.masthead{padding-block:28px 18px;border-bottom:1px solid var(--line);
+  display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.masthead__name{font-family:var(--serif);font-weight:700;font-size:24px;letter-spacing:.04em}
+.masthead__en{font-family:var(--mono);font-size:11px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--faint);margin-top:2px}
+.me{margin-left:auto;text-align:right;font-size:13.5px;color:var(--muted)}
+/* 只有直接放在帳號區的那個 b 要獨佔一行。
+   用 .me b 會連設定面板裡每一個 <b> 都變成整行，句子會被拆碎。 */
+.me > b{display:block;color:var(--ink);font-weight:500}
+
+.sec{margin-top:34px}
+.sec__label{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--faint);display:block;margin-bottom:7px}
+.sec__title{font-family:var(--serif);font-weight:600;font-size:19px}
+.sec__hint{color:var(--muted);font-size:13.5px;margin-top:4px;max-width:46em}
+
+input,select,textarea{width:100%;padding:9px 11px;font:inherit;font-size:14.5px;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-radius:6px}
+textarea{min-height:70px;resize:vertical;line-height:1.65;background:var(--surface-2)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft)}
+label.f{display:block;font-size:13px;font-weight:500;margin:14px 0 5px}
+.btn{background:var(--accent);color:var(--paper);border:0;border-radius:6px;padding:9px 20px;
+  font-weight:700;letter-spacing:.03em}
+.btn:hover{filter:brightness(1.12)}
+.btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
+.btn--sm{padding:6px 14px;font-size:13.5px}
+.btn--ghost{background:none;color:var(--muted);border:1px solid var(--line);font-weight:500}
+.btn--ghost:hover{color:var(--ink);border-color:var(--muted);filter:none}
+.row{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.note{font-size:12.5px;color:var(--faint)}
+.note--err{color:var(--adopt)}
+
+/* 登入 */
+/* 登入前的門面。
+   背景不是裝飾：那些橫條就是一長串對話，大部分灰的是照單全收過去的，
+   有顏色的那幾條是留下判斷的地方。整個產品的主張就是這張圖。 */
+.land{position:relative;min-height:100svh;display:flex;align-items:center;
+  justify-content:center;padding-block:48px}
+/* 一段對話的形狀。灰色是照單全收過去的，有顏色的是留下判斷的地方。
+   本來想做成背景圖，但壓在文字底下會吃掉可讀性，而且它值得被看清楚——
+   這張圖就是整個產品的主張，不該只當壁紙。 */
+.trail{display:flex;align-items:flex-end;gap:3px;height:46px;margin-top:14px}
+.trail i{flex:1;min-width:2px;border-radius:2px;background:var(--none);opacity:.45}
+.trail i.j{opacity:1}
+.trail__key{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;
+  font-size:12px;color:var(--faint)}
+.trail__key span{display:flex;gap:6px;align-items:center}
+.trail__key i{width:7px;height:7px;border-radius:99px;display:inline-block}
+.land__in{position:relative;z-index:1;max-width:640px;width:100%}
+.land__mark{font-family:var(--mono);font-size:11px;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--faint)}
+.land__h{font-family:var(--serif);font-weight:700;letter-spacing:.07em;line-height:1.14;
+  font-size:clamp(36px,8vw,54px);margin-top:9px}
+.land__lede{font-family:var(--serif);line-height:1.5;margin-top:18px;
+  font-size:clamp(20px,4.2vw,27px);color:var(--ink)}
+.land__p{color:var(--ink-2);font-size:15px;margin-top:16px;max-width:38em}
+.land__pts{list-style:none;margin-top:20px;display:grid;gap:9px}
+.land__pts li{display:flex;gap:11px;align-items:baseline;font-size:14px;color:var(--ink-2)}
+.land__pts .dot{width:7px;height:7px;border-radius:99px;flex:none}
+.land__card{margin-top:26px;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;overflow:hidden}
+.land__card .hd{display:flex;gap:11px;align-items:center;padding:9px 16px;
+  background:var(--surface-2);border-bottom:1px solid var(--line-2)}
+.land__cap{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);margin-top:24px;display:block}
+.land__cta{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:30px}
+.btn--lg{padding:12px 30px;font-size:16px;border-radius:7px}
+.linkbtn{background:none;border:0;padding:0;color:var(--muted);font-size:13.5px;
+  text-decoration:underline;text-underline-offset:3px}
+.linkbtn:hover{color:var(--ink)}
+.land__foot{margin-top:26px;font-size:12.5px;color:var(--faint)}
+
+.gate{max-width:400px;margin:56px auto 0}
+.gate h1{font-family:var(--serif);font-size:22px;margin-bottom:6px}
+.gate p.lead{color:var(--muted);font-size:14px;margin-bottom:20px}
+.gate .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 22px}
+.tabs{display:flex;gap:2px;margin-bottom:6px}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);
+  padding:7px 13px;font-weight:500}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+
+/* 紀錄 */
+.srcbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.srcmeta{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+/* 分類導覽：分類收得起來，紀錄多了才找得到東西 */
+.nav{margin-top:14px;border:1px solid var(--line);border-radius:9px;background:var(--surface);
+  overflow:hidden}
+.nav__g+.nav__g{border-top:1px solid var(--line-2)}
+.nav__h{display:flex;gap:9px;align-items:center;padding:9px 14px;cursor:pointer;
+  font-size:13.5px;font-weight:500;color:var(--ink-2);user-select:none}
+.nav__h:hover{background:var(--paper)}
+.nav__caret{font-size:10px;color:var(--faint);width:10px;display:inline-block;
+  transition:transform .15s}
+.nav__h[aria-expanded="true"] .nav__caret{transform:rotate(90deg)}
+.nav__n{font-family:var(--mono);font-size:11px;color:var(--faint);margin-left:auto}
+.nav__i{display:flex;gap:9px;align-items:baseline;padding:7px 14px 7px 34px;cursor:pointer;
+  font-size:13.5px;color:var(--muted);border-top:1px solid var(--line-2)}
+.nav__i:hover{background:var(--paper);color:var(--ink)}
+.nav__i--on{background:var(--accent-soft);color:var(--ink);font-weight:500;
+  box-shadow:inset 3px 0 0 var(--accent)}
+.nav__t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav__m{font-family:var(--mono);font-size:11px;color:var(--faint);flex:none}
+.scopebar{margin-top:12px;padding:11px 15px;border:1px dashed var(--line);border-radius:8px;
+  display:flex;gap:11px;align-items:center;flex-wrap:wrap;font-size:13.5px;color:var(--muted)}
+.scopebar__lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint)}
+.scopebar__hint{flex:1;min-width:200px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;
+  background:var(--surface)}
+.seg button{border:0;background:none;color:var(--muted);padding:5px 13px;font-size:13px;font-weight:500}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--paper);font-weight:700}
+
+.stream{display:flex;flex-direction:column;gap:13px;margin-top:18px}
+.turn{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--vc,var(--none));
+  border-radius:0 9px 9px 0;overflow:hidden}
+.turn--push{--vc:var(--push)} .turn--reject{--vc:var(--reject)}
+.turn--choose{--vc:var(--choose)} .turn--flag{--vc:var(--adopt)} .turn--adopt{--vc:var(--adopt)}
+.turn__head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px;
+  border-bottom:1px solid var(--line-2);cursor:pointer}
+.turn__head:hover{background:var(--surface-2)}
+.turn--fold .turn__head{border-bottom:0}
+.seq{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+.vlabel{font-size:12.5px;font-weight:700;color:var(--vc,var(--muted));letter-spacing:.04em}
+.chip{font-size:11.5px;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:1px 9px}
+.chip--out{border-color:var(--accent);color:var(--accent)}
+.turn__time{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+.fold__more{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--accent)}
+.fold{padding:0 16px 11px;font-size:13.5px;color:var(--muted);cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.turn__q{padding:12px 16px;font-size:14.5px}
+.turn__a{padding:13px 16px;border-top:1px solid var(--line-2);color:var(--muted);font-size:14px;
+  white-space:pre-wrap;background:
+   repeating-linear-gradient(to right,transparent 0 23px,var(--grid) 23px 24px),
+   repeating-linear-gradient(to bottom,transparent 0 23px,var(--grid) 23px 24px),var(--surface-2)}
+.turn__q b,.turn__a b,.basis b{font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--faint);font-weight:500;display:block;margin-bottom:4px}
+.basis{padding:11px 16px;border-top:1px solid var(--line-2);font-size:13.5px;color:var(--ink-2)}
+.basis q{font-style:normal;color:var(--ink)}
+.why{padding:13px 16px;border-top:1px solid var(--line-2)}
+.why__meta{font-family:var(--mono);font-size:11px;color:var(--faint);
+  font-variant-numeric:tabular-nums;flex:1;min-width:0}
+.why__ask{font-family:var(--serif);font-weight:600;font-size:15px;margin-bottom:9px}
+.why__done b{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);font-weight:500;display:block;margin-bottom:3px}
+
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.metric{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:13px 15px 15px}
+.metric__n{font-family:var(--mono);font-weight:500;font-size:24px;font-variant-numeric:tabular-nums}
+.metric__c{font-size:12.5px;color:var(--muted)}
+.metric b{display:block;font-family:var(--mono);font-weight:500;font-size:24px;
+  font-variant-numeric:tabular-nums}
+.metric span{font-size:12.5px;color:var(--muted)}
+.metric--dim{border-style:dashed;background:none}
+.metric--dim b{color:var(--faint)}
+/* 一個學生的判定分布 */
+.vbar{display:flex;gap:2px;height:8px;border-radius:99px;overflow:hidden}
+.vbar i{display:block;min-width:3px}
+.vkey{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--muted)}
+.vkey span{display:flex;gap:6px;align-items:center}
+.vkey i{width:7px;height:7px;border-radius:99px;display:inline-block}
+/* 四年的形狀。
+   單一色相、由淺到深的順序色階（不是分類色），深淺只代表那天記了幾段。
+   門檻寫死不隨資料縮放——用分位數會讓安靜的一年看起來跟忙碌的一年一樣，
+   那就不能跨年比較了，而「跨年比較」正是這張圖唯一的用途。 */
+.cal{position:relative;margin-top:16px}
+.cal__wrap{display:flex;gap:7px;align-items:flex-start}
+.cal__wd{display:grid;grid-template-rows:repeat(7,12px);gap:3px;padding-top:19px;
+  font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:12px;flex:none}
+.cal__scroll{overflow-x:auto;padding-bottom:6px;flex:1;min-width:0}
+.cal__cols{width:max-content}
+.cal__months{display:grid;grid-auto-flow:column;grid-auto-columns:12px;gap:3px;
+  height:16px;font-family:var(--mono);font-size:10px;color:var(--faint)}
+.cal__months span{white-space:nowrap;overflow:visible}
+.cal__grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,12px);
+  grid-auto-columns:12px;gap:3px}
+.cal__d{width:12px;height:12px;border-radius:2.5px;background:var(--cal0);
+  box-shadow:inset 0 0 0 1px rgba(20,32,28,.05)}
+.cal__d[data-cal]{cursor:default}
+.cal__d.l1{background:var(--cal1)} .cal__d.l2{background:var(--cal2)}
+.cal__d.l3{background:var(--cal3)} .cal__d.l4{background:var(--cal4)}
+.cal__key{display:flex;gap:6px;align-items:center;margin-top:9px;
+  font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.cal__key i{width:11px;height:11px;border-radius:2.5px;display:inline-block}
+.caltip{position:absolute;z-index:30;pointer-events:none;background:var(--ink);
+  color:var(--paper);font-size:12px;line-height:1.45;padding:5px 9px;border-radius:6px;
+  white-space:nowrap;transform:translate(-50%,-100%);margin-top:-7px;
+  font-variant-numeric:tabular-nums}
+.calfacts{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;
+  font-size:13px;color:var(--muted)}
+.calfacts b{font-family:var(--mono);color:var(--ink);font-weight:500;
+  font-variant-numeric:tabular-nums}
+
+/* 設定面板：偶爾才碰的東西收在這裡，不要擠在主畫面上 */
+.setwrap{position:relative}
+.setpanel{position:absolute;right:0;top:calc(100% + 8px);z-index:40;text-align:left;
+  width:min(470px,calc(100vw - 40px));max-height:min(72vh,580px);overflow-y:auto;
+  background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:5px;
+  box-shadow:0 12px 34px rgba(20,32,28,.16);
+  font-size:15px;color:var(--ink);font-weight:400}   /* 不要繼承帳號區的小字灰字 */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .setpanel{
+  box-shadow:0 12px 34px rgba(0,0,0,.5)}}
+.setitem+.setitem{border-top:1px solid var(--line-2)}
+.setitem__h{display:flex;gap:10px;align-items:center;width:100%;padding:11px 13px;
+  background:none;border:0;text-align:left;font-size:14px;font-weight:500;color:var(--ink-2);
+  border-radius:7px;line-height:1.5}
+.setitem__h:hover{background:var(--paper);color:var(--ink)}
+.setitem__h .car{margin-left:auto;color:var(--faint);font-size:10px;transition:transform .15s}
+.setitem__h[aria-expanded="true"]{color:var(--ink);font-weight:700}
+.setitem__h[aria-expanded="true"] .car{transform:rotate(90deg)}
+.setitem__b{padding:0 13px 15px}
+@media (max-width:560px){.setpanel{position:fixed;left:16px;right:16px;width:auto;
+  top:auto;margin-top:8px;max-height:70vh}}
+/* 學生／老師切換 */
+.modesw{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;
+  background:var(--surface);margin-top:8px}
+.modesw button{border:0;background:none;color:var(--muted);padding:5px 13px;font-size:13px;
+  font-weight:500}
+.modesw button+button{border-left:1px solid var(--line)}
+.modesw button[aria-pressed="true"]{background:var(--accent);color:var(--paper);font-weight:700}
+.empty{color:var(--faint);font-size:14px;padding:22px 0}
+.foot{margin-top:38px;padding-top:16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--faint)}
+.livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);
+  margin-right:7px;vertical-align:1px}
+details.box{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:9px}
+details.box>summary{cursor:pointer;padding:11px 16px;font-size:13.5px;font-weight:500;list-style:none}
+details.box>summary::-webkit-details-marker{display:none}
+details.box>summary::before{content:"＋ ";color:var(--accent);font-family:var(--mono)}
+details.box[open]>summary::before{content:"− "}
+details.box .body{padding:0 16px 18px}
+@media (max-width:640px){.metrics{grid-template-columns:1fr 1fr}.me{margin-left:0;text-align:left}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="empty">載入中…</p></div>
+
+<script src="config.js"></script>
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+/* =========================================================
+   判斷紀錄 · 獨立版
+   資料在你自己的 Supabase。誰看得到什麼由資料庫的 RLS 決定，不是由這支程式決定。
+   ========================================================= */
+
+/* 設定優先讀 config.js；沒有那個檔就用下面這組內建的。
+   少上傳一個檔案就整站掛掉，這種失敗方式不值得留著。
+   下面這把是 anon「公開金鑰」，本來就會出現在每個人的瀏覽器裡，
+   放在這裡是正常設計——真正擋住別人資料的是資料庫裡的 RLS 規則。
+   ⚠ service_role 那一把永遠不要放進來，那一把可以繞過所有規則。 */
+const BUILTIN = {
+  SUPABASE_URL: "https://wgjyfrawkveydwpqlkfv.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndnanlmcmF3a3ZleWR3cHFsa2Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNTgzMDMsImV4cCI6MjEwNDgzNDMwM30.orOnN8CYia663OdZOBcxpq2r6gPwli-cY2Fiob_rnB8"
+};
+const ext = window.JL_CONFIG || {};
+const cfg = (ext.SUPABASE_URL && !ext.SUPABASE_URL.startsWith("在這裡")) ? ext : BUILTIN;
+if (!cfg.SUPABASE_URL) {
+  document.getElementById("app").innerHTML =
+    `<p class="empty">還沒設定 Supabase。打開 <code>config.js</code>，把 Project URL 和 anon key 填進去。</p>`;
+  throw new Error("config not set");
+}
+const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+const V = {
+  push:   { label: "有推回去",   cls: "push" },
+  reject: { label: "否決不用",   cls: "reject" },
+  choose: { label: "做了選擇",   cls: "choose" },
+  adopt:  { label: "照單全收",   cls: "adopt" }
+};
+const needsWhy = t => !!t.ai && (t.ai.verdict === "adopt" ||
+  (t.ai.verdict === "choose" && !t.ai.reasoned));
+const hasJudgment = t => !!t.ai && !needsWhy(t);
+
+let me = null, profile = null;
+let logs = [], turns = [], curId = null;
+let courses = [];                 // 我修的課
+let teaching = [];                // 我開的課
+/* 身分在註冊時決定，之後登入看到的就是兩套不同的畫面。
+   它只決定「你看到哪個畫面」，不決定「你看得到誰的資料」——
+   後者是 logs / turns 的資料庫政策在管，勾了老師不會多看到任何一個人。 */
+let signRole = "student";         // 註冊表單上選的
+const isTeacher = () => profile?.role === "teacher";
+let tCourse = null, tInfo = null, tRoster = [], tWho = null, tLogs = [], tTurns = [];
+let tLogId = null, tOpen = {}, tMsg = "";
+let tokens = [];                  // 我發出去的匯入代碼
+let cats = [];                    // 我自己建的分類
+let turnCount = {};               // 每份紀錄有幾段，導覽上要顯示
+let dayCount = {};                // 每一天有幾段，四年的形狀要用
+let trash = [];                   // 垃圾桶裡的紀錄（14 天後才真的消失）
+let view = "land";                // 沒登入的時候：先看門面，按了才進登入畫面
+let authTab = "in", msg = "", busy = false;
+let foldState = {}, importMsg = "", bridgeAt = 0, codeMsg = "", catMsg = "";
+let editWhy = null;               // 正在改哪一段的補充說明
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const p2 = n => String(n).padStart(2, "0");
+const clock = t => { const d = new Date(t);
+  return `${p2(d.getMonth()+1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+const cur = () => logs.find(l => l.id === curId) || null;
+
+/* 指紋要跟外掛算出來的一致，同一輪才不會重複進來 */
+function fingerprint(t) {
+  const s = (t.q || "").slice(0, 150) + "§" + (t.a || "").slice(0, 150);
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return String(h);
+}
+
+/* ---------- 資料 ---------- */
+async function loadAll() {
+  const [{ data: ls }, { data: cs }, { data: pf }, { data: tk }, { data: ct }] = await Promise.all([
+    sb.from("logs").select("*").order("created_at", { ascending: true }),
+    sb.from("courses").select("*"),
+    sb.from("profiles").select("*").eq("id", me.id).maybeSingle(),
+    sb.from("import_tokens").select("*").order("created_at", { ascending: false }),
+    sb.from("categories").select("*").order("name")
+  ]);
+  const all = ls || [];
+  logs  = all.filter(l => !l.deleted_at);           // 列表上只有還在的
+  trash = all.filter(l => l.deleted_at)             // 垃圾桶另外放
+             .sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+  // courses 這張表同時回「我修的」跟「我開的」——政策允許兩種。在這裡分開。
+  const allC = cs || [];
+  teaching = allC.filter(c => c.teacher === me.id);
+  courses  = allC.filter(c => c.teacher !== me.id);
+  profile = pf || null; tokens = tk || []; cats = ct || [];
+
+  // 每份紀錄的段數，以及每一天的段數。只取兩欄，不把內容整批拉下來。
+  const { data: ids } = await sb.from("turns").select("log_id,captured_at");
+  turnCount = {}; dayCount = {};
+  (ids || []).forEach(r => {
+    turnCount[r.log_id] = (turnCount[r.log_id] || 0) + 1;
+    const k = dayKey(r.captured_at);
+    if (k) dayCount[k] = (dayCount[k] || 0) + 1;
+  });
+
+  lastStamp = stampOf(all, turnCount);
+  if (!isUuid(curId) || !logs.some(l => l.id === curId))
+    curId = logs[logs.length - 1]?.id || null;
+  await loadTurns();
+}
+
+/* ---------- 讓畫面自己跟上 ----------
+   外掛有兩條路把資料送進來：交給這一頁寫（bridge），或拿匯入代碼自己寫（直送）。
+   走直送的時候，資料是繞過這一頁進資料庫的——這一頁根本不知道，
+   所以以前非得重新整理才看得到。那不叫即時。
+
+   這裡補上兩層：
+   1. Realtime 訂閱：資料庫一有新段落就推過來，通常一秒內。
+   2. 每 6 秒輪詢一次當作保險：Realtime 沒開、或連線斷了，最多也只慢 6 秒。
+   兩層都只比對「有沒有變」，沒變就不重畫。 */
+let lastStamp = "";
+
+function stampOf(all, counts) {
+  return (all || []).map(l =>
+    l.id + ":" + l.updated_at + ":" + (l.deleted_at ? 1 : 0) + ":" + (counts[l.id] || 0)
+  ).sort().join("|");
+}
+
+async function refreshIfChanged() {
+  if (!me || busy || document.hidden || isTeacher()) return;
+  // 正在打字就先不要重畫，不然會把人家寫到一半的那句話洗掉
+  const el = document.activeElement;
+  if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT")) return;
+
+  const [{ data: ls }, { data: ids }] = await Promise.all([
+    sb.from("logs").select("id,updated_at,deleted_at"),
+    sb.from("turns").select("log_id")
+  ]);
+  if (!ls) return;
+  const counts = {};
+  (ids || []).forEach(r => { counts[r.log_id] = (counts[r.log_id] || 0) + 1; });
+  if (stampOf(ls, counts) === lastStamp) return;
+
+  await loadAll();
+  await loadTurns();
+  render();
+}
+
+const isUuid = v => typeof v === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+async function loadTurns() {
+  // curId 不是合法 uuid 就不要送出去查——送了資料庫會回 400，
+  // 而 400 在瀏覽器上會長得像 CORS 錯誤，很難查。
+  if (!isUuid(curId)) { turns = []; return; }
+  const { data, error } = await sb.from("turns").select("*").eq("log_id", curId)
+    .order("captured_at", { ascending: true });
+  if (error) { console.warn("[判斷紀錄] 讀取失敗：", error.message); turns = []; return; }
+  turns = data || [];
+}
+
+/* 一次匯入多份（搬家用） */
+async function ingestMany(list, opts = {}) {
+  let files = 0, added = 0;
+  for (const one of list) {
+    const r = await ingest(one, opts);
+    if (r.changed) { files++; added += (r.added || 0); }
+  }
+  return { changed: files > 0, msg: files
+    ? `匯入 ${files} 份紀錄、共 ${added} 段。`
+    : "這些紀錄都已經在裡面了，沒有新的。" };
+}
+
+/* 找出這個對話已經有的那一份。
+   不能只翻記憶體裡的 logs——外掛可能已經用匯入代碼直接寫進資料庫了，
+   那一份這一頁還沒看過。只看記憶體就會以為不存在，然後開第二份。 */
+async function findLog(key) {
+  if (!key) return null;
+  const hit = logs.find(l => l.captured_from === key);
+  if (hit) return hit;
+  const inTrash = trash.find(l => l.captured_from === key);
+  if (inTrash) return inTrash;      // 在垃圾桶裡也算存在，段落照樣寫進去
+  const { data } = await sb.from("logs").select("*").eq("captured_from", key).limit(1);
+  const row = (data || [])[0];
+  if (!row) return null;
+  // 丟過垃圾桶的不要放回列表——你按過的刪除不該被系統推翻
+  if (row.deleted_at) { if (!trash.some(l => l.id === row.id)) trash.push(row); }
+  else if (!logs.some(l => l.id === row.id)) logs.push(row);
+  return row;
+}
+
+async function ingest(payload, opts = {}) {
+  if (!payload || !Array.isArray(payload.turns) || !payload.turns.length)
+    return { changed: false, msg: "這份資料裡沒有對話內容。" };
+
+  // 沒有來源網址就用標題當作識別，不然每匯入一次就多開一份
+  const key = payload.captured_from || payload.capturedFrom
+    || (payload.title ? "local://" + payload.title : null);
+
+  let log = await findLog(key);
+
+  if (!log) {
+    const { data, error } = await sb.from("logs").insert({
+      owner: me.id,
+      title: payload.title || "未命名對話",
+      source: payload.source || "外掛擷取",
+      captured_from: key,
+      scope: payload.scope === "course" ? "course" : "self"
+    }).select().single();
+
+    if (error) {
+      // 23505 = 撞到「同一個對話只能有一份」。
+      // 代表另一條路在這幾毫秒內剛好開了同一份——去用它的，不要再開一份。
+      if (error.code === "23505") {
+        log = await findLog(key);
+        if (!log) return { changed: false, msg: "建立紀錄失敗：" + error.message };
+      } else {
+        return { changed: false, msg: "建立紀錄失敗：" + error.message };
+      }
+    } else { log = data; logs.push(log); }
+  }
+
+  const rows = payload.turns.map(t => ({
+    log_id: log.id, owner: me.id,
+    fingerprint: fingerprint(t),
+    captured_at: new Date(t.t || Date.now()).toISOString(),
+    q: t.q || "", a: t.a || "", produced: t.produced || "",
+    // 搬家時把既有的判定與補充說明一起帶過來，不要重判一次
+    ...(t.ai ? { ai: t.ai } : {}),
+    ...(t.why ? { why: t.why } : {})
+  }));
+  const { data: ins, error } = await sb.from("turns")
+    .upsert(rows, { onConflict: "log_id,fingerprint", ignoreDuplicates: true })
+    .select();
+  if (error) return { changed: false, msg: "寫入失敗：" + error.message };
+
+  const added = (ins || []).length;
+  if (!added) return { changed: false, msg: `「${log.title}」已經是最新的。` };
+  if (!opts.quiet && !log.deleted_at) curId = log.id;
+  await sb.from("logs").update({ updated_at: new Date().toISOString() }).eq("id", log.id);
+  return { changed: true, added, msg: `寫進「${log.title}」${added} 輪。`, logId: log.id };
+}
+
+/* ---------- 老師端 ----------
+   這一側只能讀，而且讀得到的東西由資料庫決定，不是由這支程式決定：
+   只有「掛在你課底下」而且「學生標成課程作業」的紀錄。
+   學生標成自主研究的，這裡查不到——連你是老師也一樣。 */
+async function loadCourse(cid) {
+  tCourse = cid; tWho = null; tLogId = null; tLogs = []; tTurns = []; tOpen = {};
+  if (!cid) { tInfo = null; tRoster = []; return; }
+
+  const { data: info } = await sb.rpc("course_overview", { _course: cid });
+  tInfo = info || null;
+
+  const [{ data: en }, { data: ls }] = await Promise.all([
+    sb.from("enrollments").select("*").eq("course_id", cid),
+    sb.from("logs").select("*").eq("course_id", cid)
+  ]);
+  const ids = (en || []).map(e => e.student);
+  const { data: ps } = ids.length
+    ? await sb.from("profiles").select("*").in("id", ids) : { data: [] };
+
+  const mine = (ls || []).filter(l => l.scope === "course" && !l.deleted_at);
+  const logIds = mine.map(l => l.id);
+  const { data: ts } = logIds.length
+    ? await sb.from("turns").select("*").in("log_id", logIds) : { data: [] };
+
+  const byLog = {};
+  (ts || []).forEach(t => { (byLog[t.log_id] = byLog[t.log_id] || []).push(t); });
+
+  tRoster = ids.map(id => {
+    const ps1 = (ps || []).find(p => p.id === id);
+    const his = mine.filter(l => l.owner === id);
+    const turns = his.flatMap(l => byLog[l.id] || []);
+    const cnt = { adopt: 0, push: 0, reject: 0, choose: 0, none: 0 };
+    turns.forEach(t => { const v = t.ai?.verdict; cnt[v ? v : "none"]++; });
+    return {
+      id, name: ps1?.display_name || "（未命名）",
+      logs: his, turns: turns.length, cnt,
+      pending: turns.filter(t => needsWhy(t) && !(t.why || "").trim()).length,
+      opens: turns.reduce((n, t) => n + (t.opens || 0), 0)
+    };
+  }).sort((a, b) => b.turns - a.turns);
+}
+
+async function openStudent(id) {
+  tWho = id; tLogId = null; tTurns = [];
+  const r = tRoster.find(x => x.id === id);
+  tLogs = r ? r.logs : [];
+  if (tLogs.length === 1) await openStudentLog(tLogs[0].id);
+}
+
+async function openStudentLog(id) {
+  tLogId = id;
+  const { data } = await sb.from("turns").select("*").eq("log_id", id)
+    .order("captured_at", { ascending: true });
+  tTurns = data || [];
+}
+
+/* 追問建議：從紀錄本身的缺口長出來的，不是評分。
+   老師拿到的是「該問什麼」，因為能不能答得出來，才是 AI 代替不了的部分。 */
+function followups(ts) {
+  const out = [];
+  const no = t => ts.indexOf(t) + 1;
+  const list = arr => arr.slice(0, 3).map(no).join("、");
+
+  if (!ts.some(t => t.ai))
+    return ["這份紀錄還沒有判讀。可以請學生先在自己的頁面按一次「判讀這份紀錄」，再回來看。"];
+
+  const bare = ts.filter(t => t.ai?.verdict === "adopt" && !(t.why || "").trim());
+  if (bare.length) out.push(`第 ${list(bare)} 段是照單全收，也沒有留下說明。當時你怎麼確認那段內容是對的？`);
+
+  const thin = ts.filter(t => (t.why || "").trim() && t.why.trim().length < 10);
+  if (thin.length) out.push(`第 ${list(thin)} 段的說明只有幾個字。你是根據什麼下這個判斷的？`);
+
+  const ch = ts.filter(t => t.ai?.verdict === "choose" && !t.ai?.reasoned);
+  if (ch.length) out.push(`第 ${list(ch)} 段你在幾個做法裡挑了一個，但沒說為什麼。其他選項差在哪裡？`);
+
+  const big = ts.filter(t => (t.a || "").length > 700 && t.ai?.verdict === "adopt");
+  if (big.length) out.push(`第 ${list(big)} 段 AI 給了很長一段而你整段採用。這裡面你最有把握的是哪一句、最沒把握的是哪一句？`);
+
+  if (!ts.some(t => t.ai?.verdict === "reject"))
+    out.push("整份紀錄沒有任何一段被否決。有沒有哪一段你其實不太同意，但還是用了？");
+
+  if (!out.length) out.push("這份紀錄每一段都留下了判斷與理由。可以挑一段請他當場重講一次推論過程。");
+  return out.slice(0, 4);
+}
+
+function viewTeacher() {
+  const c = teaching.find(x => x.id === tCourse) || null;
+
+  return `
+  ${mastheadHTML()}
+
+  <section class="sec">
+    <span class="sec__label">Teaching</span>
+    <h2 class="sec__title">老師檢視</h2>
+    <p class="sec__hint">你只看得到<b>掛在你課底下</b>而且<b>學生標成課程作業</b>的紀錄。
+      學生標成自主研究的，你在資料庫那一層就查不到——這不是畫面藏起來，是查詢被擋掉。
+      另外，你每展開一次原文，學生在他自己的頁面上都看得到。</p>
+
+    <div class="row">
+      ${teaching.length ? `<select id="tpick" style="max-width:260px">
+        <option value="">選一門課</option>
+        ${teaching.map(x => `<option value="${x.id}" ${x.id === tCourse ? "selected" : ""}>${
+          esc(x.name)}${x.semester ? " · " + esc(x.semester) : ""}</option>`).join("")}
+      </select>` : ""}
+      <input id="cname" placeholder="課程名稱" style="max-width:180px" autocomplete="off">
+      <input id="csem" placeholder="學期，例如 114-1" style="max-width:150px" autocomplete="off">
+      <button class="btn btn--sm" id="mkcourse">開一門課</button>
+      <span class="note">${esc(tMsg)}</span>
+    </div>
+
+    ${c ? `<div class="scopebar">
+      <span class="scopebar__lab">課程代碼</span>
+      <b style="font-family:var(--mono);letter-spacing:.1em;font-size:15px;color:var(--ink)">${esc(c.join_code)}</b>
+      <button class="btn btn--ghost btn--sm" data-copycode="${esc(c.join_code)}">複製</button>
+      <span class="scopebar__hint">學生在自己的頁面輸入這組代碼就能加入。</span>
+    </div>` : ""}
+
+    ${tInfo ? `<div class="metrics">
+      <div class="metric"><b>${tInfo.students}</b><span>班上人數</span></div>
+      <div class="metric"><b>${tInfo.submitters}</b><span>有交紀錄</span></div>
+      <div class="metric"><b>${tInfo.visible}</b><span>你看得到的紀錄</span></div>
+      <div class="metric metric--dim"><b>${tInfo.hidden}</b><span>學生標成自主研究，你看不到</span></div>
+    </div>
+    <p class="note" style="margin-top:8px">最後那個數字是故意給你的。
+      知道「有東西我看不到」，比以為自己看到了全部要安全。</p>` : ""}
+  </section>
+
+  ${c ? (tWho ? viewStudent() : viewRoster()) : ""}
+
+  <p class="foot">老師端只能讀，不能改學生的紀錄。你讀了哪一段、讀了幾次，學生看得到。</p>`;
+}
+
+function viewRoster() {
+  if (!tRoster.length)
+    return `<p class="empty">還沒有人加入這門課。把上面那組課程代碼給學生。</p>`;
+  return `
+  <section class="sec">
+    <span class="sec__label">Roster</span>
+    <h2 class="sec__title">班級 ${tRoster.length} 人</h2>
+    <div class="stream">${tRoster.map(s => `
+      <article class="turn">
+        <div class="turn__head">
+          <span class="vlabel">${esc(s.name)}</span>
+          <span class="chip">${s.logs.length} 份 · ${s.turns} 段</span>
+          ${s.pending ? `<span class="chip" style="color:var(--adopt)">${s.pending} 段待補說明</span>` : ""}
+          ${s.opens ? `<span class="chip">你查閱過</span>` : ""}
+          <span class="turn__time">${s.turns ? "" : "還沒有內容"}</span>
+        </div>
+        ${s.turns ? `<div class="turn__q" style="padding-top:10px">${verdictBar(s.cnt, s.turns)}</div>` : ""}
+        <div class="row" style="padding:0 16px 13px;margin-top:0">
+          <button class="btn btn--ghost btn--sm" data-tstu="${s.id}">看他的紀錄</button>
+        </div>
+      </article>`).join("")}</div>
+  </section>`;
+}
+
+/* 一條比例條：這個學生的每一段各是什麼判定 */
+function verdictBar(cnt, total) {
+  const seg = [["push", "有推回去"], ["reject", "否決不用"], ["choose", "做了選擇"],
+               ["adopt", "照單全收"], ["none", "尚未判讀"]];
+  return `<div class="vbar">${seg.map(([k]) => cnt[k]
+    ? `<i style="flex:${cnt[k]};background:var(--${k})" title="${cnt[k]}"></i>` : "").join("")}</div>
+    <div class="vkey">${seg.map(([k, label]) => cnt[k]
+      ? `<span><i style="background:var(--${k})"></i>${label} ${cnt[k]}</span>` : "").join("")}</div>`;
+}
+
+function viewStudent() {
+  const s = tRoster.find(x => x.id === tWho);
+  if (!s) return "";
+  const log = tLogs.find(l => l.id === tLogId) || null;
+
+  return `
+  <section class="sec">
+    <span class="sec__label">Student</span>
+    <h2 class="sec__title">${esc(s.name)}</h2>
+    <div class="row">
+      <button class="btn btn--ghost btn--sm" id="tback">← 回班級</button>
+      ${tLogs.length ? `<select id="tlog" style="max-width:280px">
+        <option value="">選一份紀錄</option>
+        ${tLogs.map(l => `<option value="${l.id}" ${l.id === tLogId ? "selected" : ""}>${esc(l.title)}</option>`).join("")}
+      </select>` : `<span class="note">他還沒有標成課程作業的紀錄。</span>`}
+    </div>
+
+    ${log ? `
+    <div class="box" style="margin-top:16px">
+      <div class="body" style="padding-top:16px">
+        <span class="sec__label">Ask</span>
+        <h3 class="sec__title" style="font-size:16px">可以問他這幾個問題</h3>
+        <p class="note" style="margin-top:4px">從紀錄本身的缺口長出來的，不是評分。
+          能不能當場答得出來，才是 AI 代替不了的部分。</p>
+        <ul class="land__pts" style="margin-top:12px">${followups(tTurns).map(q =>
+          `<li><span class="dot" style="background:var(--accent)"></span>${esc(q)}</li>`).join("")}</ul>
+      </div>
+    </div>
+
+    <p class="sec__hint" style="margin-top:18px">${tTurns.length} 段。
+      原文預設收著——<b>你每展開一次，他都看得到</b>。先看判定，需要才展開。</p>
+    <div class="stream">${tTurns.map((t, i) => tTurnHTML(t, i)).join("")}</div>` : ""}
+  </section>`;
+}
+
+function tTurnHTML(t, i) {
+  const v = t.ai?.verdict;
+  const open = !!tOpen[t.id];
+  return `<article class="turn ${v ? `turn--${V[v].cls}` : ""}">
+    <div class="turn__head">
+      <span class="seq">${p2(i + 1)}</span>
+      <span class="vlabel">${v ? V[v].label : "尚未判讀"}</span>
+      ${t.opens ? `<span class="chip">已查閱</span>` : ""}
+      <span class="turn__time">${clock(t.captured_at)}</span>
+    </div>
+    <div class="turn__q"><b>學生說</b>${esc(t.q)}</div>
+    ${t.ai?.basis ? `<div class="basis"><b>AI 判定依據</b><q>${esc(t.ai.basis)}</q></div>` : ""}
+    ${(t.why || "").trim() ? `<div class="why">
+      <p class="why__done"><b>他補的說明</b>${esc(t.why)}</p>
+      <div class="row" style="margin-top:6px">${whyMeta(t)}</div>
+    </div>` : ""}
+    ${open
+      ? `<div class="turn__a"><b>AI 回覆 · 擷取當下的原文</b>${esc(t.a)}</div>`
+      : `<div class="row" style="padding:0 16px 13px">
+           <button class="btn btn--ghost btn--sm" data-topen="${t.id}">展開 AI 原文（會留痕）</button>
+         </div>`}
+  </article>`;
+}
+
+/* ---------- 畫面 ---------- */
+function render() {
+  document.getElementById("app").innerHTML =
+    me ? (isTeacher() ? viewTeacher() : viewApp())
+       : (view === "land" ? viewLand() : viewGate());
+}
+
+/* ---------- 登入前的門面 ----------
+   背景那一長串橫條就是一段對話：灰的是照單全收過去的，
+   有顏色的那幾條是留下判斷的地方。寫死不亂數，每次進來都一樣。 */
+/* 一段 52 輪的對話。數字寫死，不亂數——每次進來看到的是同一段。
+   h = 那一輪的長度，v = 那一輪留下的判斷。 */
+const TRAIL = [
+  [40], [62], [35], [78], [50], [44, "push"], [66], [30], [85], [48],
+  [57], [39], [72, "adopt"], [33], [60], [90], [42], [55], [28], [68],
+  [46, "reject"], [80], [36], [63], [51], [74], [31], [58, "push"], [44], [87],
+  [38], [65], [49], [76], [34, "choose"], [59], [43], [82], [52], [29],
+  [70], [47], [61, "push"], [37], [88], [41], [56], [33], [64], [45],
+  [79], [50]
+];
+
+function viewLand() {
+  const trail = TRAIL.map(([h, v]) =>
+    `<i class="${v ? "j" : ""}" style="height:${h}%${
+      v ? `;background:var(--${v})` : ""}"></i>`).join("");
+
+  return `
+  <div class="land">
+    <div class="land__in">
+      <div class="land__mark">Judgment Log</div>
+      <h1 class="land__h">判斷紀錄</h1>
+      <p class="land__lede">成品可以被生出來，<br>判斷不行。</p>
+
+      <p class="land__p">生成式 AI 已經參與大學生的每一份報告、專題甚至履歷，
+        成績單和作品同時失去了可信度。判斷紀錄不去證明你沒用 AI——
+        它記下你在用 AI 的<b>當下</b>做了哪些判斷：哪裡照單全收、哪裡推回去、
+        哪裡否決，以及為什麼。</p>
+
+      <span class="land__cap">一份作業的對話長這樣</span>
+      <div class="trail" aria-hidden="true">${trail}</div>
+      <div class="trail__key">
+        <span><i style="background:var(--none)"></i>照單全收</span>
+        <span><i style="background:var(--push)"></i>有推回去</span>
+        <span><i style="background:var(--reject)"></i>否決不用</span>
+        <span><i style="background:var(--adopt)"></i>做了選擇</span>
+      </div>
+      <p class="land__p" style="margin-top:12px">五十幾輪裡，真正留下判斷的只有那幾根。
+        <b>老師想看的是那幾根，而那幾根 AI 生不出來。</b></p>
+
+      <ul class="land__pts">
+        <li><span class="dot" style="background:var(--push)"></span>
+          對話原文與時間在發生的當下寫入，事後你自己也改不了</li>
+        <li><span class="dot" style="background:var(--reject)"></span>
+          你決定一份紀錄屬於哪裡，但不能決定它存不存在</li>
+        <li><span class="dot" style="background:var(--adopt)"></span>
+          老師只看得到你標成課程作業的那些，其餘的他查不到</li>
+      </ul>
+
+      <span class="land__cap">放大看其中一根</span>
+      <div class="land__card">
+        <div class="hd">
+          <span class="seq">03</span>
+          <span class="vlabel" style="--vc:var(--push)">有推回去</span>
+          <span class="turn__time">09-13 14:22</span>
+        </div>
+        <div class="turn__q"><b>你說</b>這個 37% 哪來的？先給我出處，我再決定要不要放進報告</div>
+        <div class="turn__a"><b>AI 回覆 · 擷取當下的原文</b>抱歉，那個數字我沒有可靠來源，
+          是我依照產業平均推估的。正確的做法是去查主計總處的原始統計⋯⋯</div>
+      </div>
+
+      <div class="land__cta">
+        <button class="btn btn--lg" id="enter">開始使用</button>
+        <button class="linkbtn" id="enter2">我已經有帳號，直接登入</button>
+      </div>
+
+      <p class="land__foot">你的紀錄只有你自己看得到。誰看得到什麼由資料庫的規則決定，不是由這個畫面決定。</p>
+    </div>
+  </div>`;
+}
+
+function viewGate() {
+  return `
+  <div class="gate">
+    <button class="linkbtn" id="back" style="margin-bottom:14px">← 這是什麼</button>
+    <h1>判斷紀錄</h1>
+    <p class="lead">成品可以被生出來，判斷不行。<br>
+      註冊一個帳號，你的紀錄只有你自己看得到。</p>
+    <div class="card">
+      <div class="tabs">
+        <button data-tab="in" aria-selected="${authTab === "in"}">登入</button>
+        <button data-tab="up" aria-selected="${authTab === "up"}">註冊</button>
+      </div>
+      ${authTab === "up" ? `
+        <label class="f">你是</label>
+        <div class="seg" id="srole" style="width:100%">
+          <button data-srole="student" aria-pressed="${signRole === "student"}"
+            style="flex:1">學生</button>
+          <button data-srole="teacher" aria-pressed="${signRole === "teacher"}"
+            style="flex:1">老師</button>
+        </div>
+        <p class="note" style="margin-top:6px">${signRole === "student"
+          ? "你會看到自己的判斷紀錄，以及加入課程的地方。"
+          : "你會看到班級名單、每個學生的判斷分布，以及可以追問他的問題。老師端不會有學生那一側的功能。"}</p>
+        <label class="f" for="name">你的名字</label>
+        <input id="name" placeholder="${signRole === "teacher"
+          ? "學生在課程裡看到的名字" : "老師在班級名單上看到的名字"}">` : ""}
+      <label class="f" for="email">Email</label>
+      <input id="email" type="email" autocomplete="email">
+      <label class="f" for="pw">密碼</label>
+      <input id="pw" type="password" autocomplete="${authTab === "up" ? "new-password" : "current-password"}">
+      <div class="row">
+        <button class="btn" id="go" ${busy ? "disabled" : ""}>
+          ${busy ? "處理中…" : (authTab === "up" ? "建立帳號" : "登入")}</button>
+        <span class="note ${msg ? "note--err" : ""}">${esc(msg)}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- 設定面板 ----------
+   這些都是「偶爾才會碰一次」的東西，攤在主畫面上會把真正的內容擠到下面去。
+   收進一顆設定鍵，點開才出現，一次只展開一項。
+   展開狀態存在 state 裡，不是 <details> 的 DOM 狀態——
+   不然每次操作完重畫，你剛打開的那一格就會自己關起來。 */
+let settingsOpen = false, setTab = "";
+
+function settingsItems() {
+  if (isTeacher()) return [{ k: "role", t: `我的身分（老師）`, body: roleBody }];
+  return [
+    { k: "cat",   t: `分類管理（${cats.length} 個）`, body: catBody },
+    ...(trash.length ? [{ k: "trash", t: `垃圾桶（${trash.length} 份）`, body: trashBody }] : []),
+    { k: "code",  t: `匯入代碼${tokens.filter(live).length ? "" : "（還沒發）"}`, body: tokenBody },
+    { k: "key",   t: `AI 判讀金鑰${hasKey() ? "" : "（還沒設）"}`, body: keyBody },
+    { k: "role",  t: `我的身分（學生）`, body: roleBody }
+  ];
+}
+
+function settingsPanel() {
+  if (!settingsOpen) return "";
+  return `<div class="setpanel" id="setpanel">${settingsItems().map(it => `
+    <div class="setitem">
+      <button class="setitem__h" data-settab="${it.k}" aria-expanded="${setTab === it.k}">
+        ${esc(it.t)}<span class="car">▶</span>
+      </button>
+      ${setTab === it.k ? `<div class="setitem__b">${it.body()}</div>` : ""}
+    </div>`).join("")}</div>`;
+}
+
+/* 選錯身分的人要有路可以回頭，但這件事不該放在主畫面上。
+   改身分不會讓任何人多看到一筆資料——看得到什麼是資料庫的政策在管。 */
+function roleBody() {
+  const t = isTeacher();
+  return `
+      <p class="note">身分只決定你看到哪一個畫面，<b>不決定你看得到誰的資料</b>。
+        改成老師不會讓你多看到任何一個人——老師要看得到東西，必須有學生拿著你的課程代碼
+        主動加入你的課，而且把那份紀錄標成課程作業。</p>
+      <div class="row">
+        <button class="btn btn--ghost btn--sm" data-setrole="${t ? "student" : "teacher"}">
+          改成${t ? "學生" : "老師"}</button>
+        <span class="note">${t
+          ? "改成學生之後，你開的課不會消失，只是看不到老師那一側。"
+          : "改成老師之後，你自己的紀錄不會被刪，改回來就看得到。"}</span>
+      </div>`;
+}
+
+/* ---------- 四年的形狀 ----------
+   這張圖唯一的資產是「時間改不了」。密集的期末、空白的寒假、某個專題那兩週的爆量，
+   是一個真的活過四年的人才會有的形狀——事後補不出來，因為擷取時間寫進去就鎖死了。
+
+   刻意不放任何分數或比例。一旦有分數，人就會做給分數看，紀錄就失真，
+   而失真的紀錄比沒有紀錄更糟。這裡只呈現事實：哪一天有、有幾段。 */
+const dayKey = ts => {
+  const d = new Date(ts);
+  if (isNaN(d)) return null;
+  return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate());
+};
+const WD = ["日", "一", "二", "三", "四", "五", "六"];
+const MON = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+
+/* 門檻固定，不隨資料縮放——這樣今年跟大一那年才比得起來 */
+const calLevel = n => !n ? 0 : n <= 2 ? 1 : n <= 5 ? 2 : n <= 10 ? 3 : 4;
+
+function calendarHTML() {
+  const keys = Object.keys(dayCount);
+  if (!keys.length) return "";
+  keys.sort();
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const end = new Date(today); end.setDate(end.getDate() + (6 - end.getDay()));  // 本週週六
+  const firstSeen = new Date(keys[0] + "T00:00:00");
+  let start = new Date(firstSeen); start.setDate(start.getDate() - start.getDay()); // 該週週日
+
+  const week = 7 * 86400000;
+  let weeks = Math.round((end - start) / week) + 1;
+  if (weeks < 26) { start = new Date(end - 25 * week); weeks = 26; }   // 太短會看起來像壞掉
+  if (weeks > 209) { start = new Date(end - 208 * week); weeks = 209; } // 最多四年
+
+  const months = [], cols = [];
+  let lastMon = -1;
+  for (let w = 0; w < weeks; w++) {
+    let label = "";
+    const cells = [];
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(start); day.setDate(start.getDate() + w * 7 + d);
+      if (d === 0) {
+        const m = day.getMonth();
+        if (m !== lastMon) {
+          lastMon = m;
+          label = m === 0 ? String(day.getFullYear()) : MON[m];
+        }
+      }
+      if (day > today) { cells.push(`<div class="cal__d" style="visibility:hidden"></div>`); continue; }
+      const k = dayKey(day), n = dayCount[k] || 0;
+      cells.push(`<div class="cal__d l${calLevel(n)}" data-cal="${k}" data-n="${n}"></div>`);
+    }
+    months.push(`<span>${label}</span>`);
+    cols.push(cells.join(""));
+  }
+
+  const total = keys.reduce((s, k) => s + dayCount[k], 0);
+  const busiest = keys.reduce((a, k) => dayCount[k] > dayCount[a] ? k : a, keys[0]);
+  const span = Math.round((today - firstSeen) / 86400000) + 1;
+
+  return `
+  <div class="cal">
+    <div class="cal__wrap">
+      <div class="cal__wd">${WD.map((w, i) => `<span>${i % 2 ? w : ""}</span>`).join("")}</div>
+      <div class="cal__scroll">
+        <div class="cal__cols">
+          <div class="cal__months">${months.join("")}</div>
+          <div class="cal__grid">${cols.join("")}</div>
+        </div>
+      </div>
+    </div>
+    <div class="cal__key">少
+      ${[0,1,2,3,4].map(l => `<i style="background:var(--cal${l})"></i>`).join("")}多</div>
+    <div class="calfacts">
+      <span>第一段 <b>${keys[0].slice(5).replace("-", "/")}</b></span>
+      <span>橫跨 <b>${span}</b> 天</span>
+      <span>有紀錄的 <b>${keys.length}</b> 天</span>
+      <span>累計 <b>${total}</b> 段</span>
+      <span>最多的一天 <b>${busiest.slice(5).replace("-", "/")}</b>（${dayCount[busiest]} 段）</span>
+    </div>
+    <div class="caltip" id="caltip" hidden></div>
+  </div>`;
+}
+
+function mastheadHTML() {
+  return `
+  <header class="masthead">
+    <div>
+      <div class="masthead__name">判斷紀錄</div>
+      <div class="masthead__en">Judgment Log</div>
+    </div>
+    <div class="me setwrap">
+      <b>${esc(profile?.display_name || me.email)}</b>
+      <span class="chip" style="display:inline-block;margin-top:4px">${
+        isTeacher() ? "老師" : "學生"}</span>
+      <div class="row" style="justify-content:flex-end;margin-top:6px">
+        <button class="btn btn--ghost btn--sm" id="setbtn"
+          aria-expanded="${settingsOpen}">設定</button>
+        <button class="btn btn--ghost btn--sm" id="out">登出</button>
+      </div>
+      ${settingsPanel()}
+    </div>
+  </header>`;
+}
+
+function viewApp() {
+  const log = cur();
+  const judged = turns.filter(t => t.ai);
+  const pending = turns.filter(t => needsWhy(t) && !(t.why || "").trim()).length;
+  const anyOpen = turns.some((t, i) => isOpen(t, i));
+
+  return `
+  ${mastheadHTML()}
+
+  ${Object.keys(dayCount).length ? `<section class="sec">
+    <span class="sec__label">Four years</span>
+    <h2 class="sec__title">四年的形狀</h2>
+    <p class="sec__hint">每一格是一天，顏色深淺是那天記了幾段。
+      這裡沒有分數也沒有比例——<b>擷取時間寫進去就改不了，所以這個形狀補不出來。</b></p>
+    ${calendarHTML()}
+  </section>` : ""}
+
+  <section class="sec">
+    <span class="sec__label">Your logs</span>
+    <h2 class="sec__title">我的判斷紀錄</h2>
+    <p class="sec__hint">對話原文與時間由外掛在當下擷取，你改不了。你能改的只有分類，以及被標記時補的那一句。</p>
+
+    <div class="srcbar">
+      <button class="btn btn--ghost btn--sm" id="paste">從外掛匯入</button>
+      <button class="btn btn--ghost btn--sm" id="pickfile">從檔案匯入</button>
+      <input type="file" id="file" accept=".json,application/json" hidden>
+      <span class="note">${esc(importMsg)}</span>
+    </div>
+
+    ${navHTML()}
+    ${log ? `<p class="srcmeta" style="margin-top:8px">${turns.length} 段 · ${esc(log.source || "")}</p>` : ""}
+
+    ${log ? `<div class="scopebar">
+      <span class="scopebar__lab">這份紀錄屬於</span>
+      <div class="seg" id="scope">
+        <button data-scope="course" aria-pressed="${log.scope === "course"}">課程作業</button>
+        <button data-scope="self" aria-pressed="${log.scope === "self"}">自主研究</button>
+      </div>
+      <span class="scopebar__hint">${log.scope === "self"
+        ? "只有你看得到，老師查不到這一份。"
+        : (log.course_id ? "已掛在課程底下，老師看得到。" : "還沒掛到任何課程，老師目前還看不到——到下面加入課程。")}</span>
+    </div>
+
+    <div class="scopebar">
+      <span class="scopebar__lab">分類</span>
+      <select id="setcat" style="max-width:180px">
+        <option value="">未分類</option>
+        ${cats.map(c => `<option value="${c.id}" ${log.category_id === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}
+      </select>
+      <!-- Chrome 會忽略 autocomplete="off"（它認定使用者比網站更需要自動填入）。
+           先設成唯讀、點下去才解開，自動填入的偵測就抓不到這個欄位。
+           跟課程代碼那一格同一招。 -->
+      <input id="newcat" placeholder="新增分類，例如 投資" style="max-width:170px"
+        readonly autocomplete="one-time-code" autocorrect="off" spellcheck="false"
+        name="jl-cat-${Date.now()}">
+      <button class="btn btn--ghost btn--sm" id="addcat">新增</button>
+      <button class="btn btn--ghost btn--sm" id="tocan">丟進垃圾桶</button>
+      <span class="note ${catMsg ? "" : ""}">${esc(catMsg)}</span>
+    </div>` : ""}
+  </section>
+
+  ${log ? `<section class="sec">
+    <span class="sec__label">Trail</span>
+    <h2 class="sec__title">這份紀錄 ${turns.length} 段</h2>
+    <p class="sec__hint">${judged.length
+      ? `AI 判定其中 ${turns.filter(hasJudgment).length} 段你留下了判斷。${
+          pending ? `還有 <b>${pending}</b> 段等你補一句為什麼。` : "被標記的都補完了。"}`
+      : "還沒判讀。按下面的「判讀這份紀錄」，讓 AI 逐段判斷你是照單全收還是有推回去。"}</p>
+    <div class="row">
+      ${turns.length ? `<button class="btn btn--sm" id="run" ${busy ? "disabled" : ""}>${
+        busy ? "判讀中…" : (judged.length ? "重新判讀" : "判讀這份紀錄")}</button>` : ""}
+      ${turns.length ? `<button class="btn btn--ghost btn--sm" id="foldall">${
+        anyOpen ? "全部收合" : "全部展開"}</button>` : ""}
+      <span class="note ${msg ? "note--err" : ""}">${esc(msg)}</span>
+    </div>
+    <div class="stream">${turns.map((t, i) => turnHTML(t, i)).join("")
+      || `<p class="empty">這份紀錄還沒有內容。</p>`}</div>
+  </section>` : `<p class="empty">還沒有紀錄。裝好外掛、去 ChatGPT 或 Claude 講一句話，再按「從外掛匯入」。</p>`}
+
+  <section class="sec">
+    <span class="sec__label">Course</span>
+    <h2 class="sec__title">課程</h2>
+    <p class="sec__hint">老師給你一組課程代碼，加入之後，你標成「課程作業」的紀錄才會出現在老師那邊。</p>
+    ${courses.length ? `<div class="row">${courses.map(c =>
+      `<span class="chip">${esc(c.name)}${c.semester ? " · " + esc(c.semester) : ""}</span>`).join("")}</div>` : ""}
+    <div class="row">
+      <!-- Chrome 會忽略 autocomplete="off"。先設成唯讀、點下去才解開，
+           自動填入就抓不到這個欄位。 -->
+      <input id="code" placeholder="課程代碼" readonly autocomplete="one-time-code"
+        autocorrect="off" autocapitalize="characters" spellcheck="false"
+        name="jl-course-${Date.now()}"
+        style="max-width:200px;text-transform:uppercase">
+      <button class="btn btn--ghost btn--sm" id="join">加入課程</button>
+      ${log && courses.length ? `<select id="assign" style="max-width:220px">
+        <option value="">這份紀錄不掛課程</option>
+        ${courses.map(c => `<option value="${c.id}" ${log.course_id === c.id ? "selected" : ""}>掛到：${esc(c.name)}</option>`).join("")}
+      </select>` : ""}
+      <span class="note">${esc(msg)}</span>
+    </div>
+  </section>
+
+  <p class="foot">資料存在你自己的 Supabase。誰看得到什麼由資料庫規則決定，不是由這個畫面決定。
+    <span id="bridge">${bridgeAt ? `<span class="livedot"></span>外掛已連線，${clock(bridgeAt)} 最後送達` : ""}</span></p>`;
+}
+
+/* API 金鑰那一段，抽出來給設定面板用 */
+function keyBody() {
+  return `
+      <p class="note">判讀是把整份對話交給模型，判斷每一段你是照單全收還是有推回去。
+        金鑰只存在你這台電腦，不會上傳到任何地方。
+        （正式版應該改成由後端代打，金鑰不進瀏覽器。）</p>
+
+      <label class="f" for="prov">用哪一家</label>
+      <select id="prov">
+        <option value="gemini" ${provider() === "gemini" ? "selected" : ""}>Google Gemini（有免費額度，不用信用卡）</option>
+        <option value="anthropic" ${provider() === "anthropic" ? "selected" : ""}>Anthropic Claude（需付費帳號）</option>
+      </select>
+      <p class="note" style="margin-top:6px">${provider() === "gemini"
+        ? `到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> 按 Create API key，複製貼到下面。用 Google 帳號登入就好。`
+        : `到 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> 建立金鑰，需要先儲值。`}</p>
+
+      <label class="f" for="key">API 金鑰</label>
+      <input id="key" type="password" autocomplete="off"
+        placeholder="${provider() === "gemini" ? "AIza..." : "sk-ant-..."}"
+        value="${esc(localStorage.getItem("jl_key") || "")}">
+      <div class="row">
+        <button class="btn btn--sm" id="savekey">儲存金鑰</button>
+        <span class="note">${esc(msg)}</span>
+      </div>`;
+}
+
+/* ---------- 分類與垃圾桶 ----------
+   分類 = 這份紀錄「屬於哪裡」，屬於哪裡你說了算。
+   垃圾桶 = 這份紀錄「還在不在」，而這件事不完全你說了算：
+   掛在課程底下的，得先自己改回自主研究才能丟，而那個改動會留痕給老師看。
+   規則寫在資料庫的觸發器裡，不是寫在這支程式裡。 */
+
+const catName = id => (cats.find(c => c.id === id) || {}).name || "未分類";
+const daysLeft = l => Math.max(0,
+  14 - Math.floor((Date.now() - new Date(l.deleted_at)) / 86400000));
+
+/* 紀錄多了就難找，所以照分類分群，而且每一群都收得起來。
+   收合狀態只存在這台電腦的瀏覽器裡，不上傳。 */
+let catFold = (() => {
+  try { return JSON.parse(localStorage.getItem("jl_catfold") || "{}"); } catch (e) { return {}; }
+})();
+function saveFold() {
+  try { localStorage.setItem("jl_catfold", JSON.stringify(catFold)); } catch (e) {}
+}
+/* 沒設定過的話：目前這份所在的那一群自動展開，其他收起來 */
+function groupOpen(key, hasCur) {
+  const v = catFold[key];
+  return v === undefined ? hasCur : v;
+}
+
+function navHTML() {
+  if (!logs.length)
+    return `<p class="empty">還沒有紀錄。裝好外掛、去 ChatGPT 或 Claude 講一句話。</p>`;
+
+  const groups = [...cats.map(c => [c.id, c.name]), [null, "未分類"]];
+  const body = groups.map(([id, name]) => {
+    const mine = logs.filter(l => (l.category_id || null) === id);
+    if (!mine.length) return "";
+    const key = id || "_none";
+    const hasCur = mine.some(l => l.id === curId);
+    const open = groupOpen(key, hasCur);
+    return `<div class="nav__g">
+      <div class="nav__h" data-cfold="${key}" aria-expanded="${open}">
+        <span class="nav__caret">▶</span>${esc(name)}
+        <span class="nav__n">${mine.length} 份</span>
+      </div>
+      ${open ? mine.map(l => `
+        <div class="nav__i ${l.id === curId ? "nav__i--on" : ""}" data-golog="${l.id}">
+          <span class="nav__t">${esc(l.title)}</span>
+          <span class="nav__m">${turnCount[l.id] || 0} 段${
+            l.scope === "course" ? " · 課程" : ""}</span>
+        </div>`).join("") : ""}
+    </div>`;
+  }).join("");
+
+  return `<div class="nav">${body}</div>`;
+}
+
+function catBody() {
+  return `
+      <p class="note">分類只是資料夾標籤。<b>刪掉一個分類，裡面的紀錄會留著，只是變回未分類</b>——
+        刪資料夾不該把內容一起燒掉。想丟掉某一份紀錄，要一份一份丟進垃圾桶，兩個動作分開。</p>
+      ${cats.length ? `<div class="row">${cats.map(c => {
+        const n = logs.filter(l => l.category_id === c.id).length;
+        return `<span class="chip">${esc(c.name)} · ${n} 份
+          <button class="btn btn--ghost btn--sm" data-delcat="${c.id}" style="margin-left:6px">刪除</button></span>`;
+      }).join("")}</div>` : `<p class="note">還沒有分類。到上面那一列輸入名字按「新增」。</p>`}`;
+}
+
+function trashBody() {
+  if (!trash.length) return "";
+  return `
+      <p class="note">丟進來不是消失，是 <b>14 天</b>的緩衝。時間到才真的刪掉，刪掉就回不來了。
+        這段期間外掛如果還在送同一個對話，新的段落照樣寫得進去，但這份不會自己跑回列表上。</p>
+      <div class="stream">${trash.map(l => `
+        <article class="turn turn--fold">
+          <div class="turn__head">
+            <span class="vlabel">${esc(l.title)}</span>
+            <span class="chip">還有 ${daysLeft(l)} 天</span>
+            <span class="turn__time">${clock(l.deleted_at)} 丟進來</span>
+          </div>
+          <div class="row" style="padding:0 14px 12px">
+            <button class="btn btn--sm" data-restore="${l.id}">還原</button>
+            <button class="btn btn--ghost btn--sm" data-purge="${l.id}">立刻永久刪除</button>
+          </div>
+        </article>`).join("")}</div>`;
+}
+
+/* ---------- 匯入代碼 ----------
+   外部工具（外掛、之後的手機 App）不該拿到你的帳號，也不該拿到讀取權。
+   所以它拿的是一張通行證：只能寫、只能寫給你、會過期、你隨時可以撤銷，
+   而且開出來的紀錄一律是「自主研究」——代碼不能決定誰看得到。
+   限制寫在資料庫裡，不是寫在這個畫面上。 */
+const activeCode = () => localStorage.getItem("jl_code") || "";
+const live = tk => !tk.revoked_at && new Date(tk.expires_at) > new Date();
+const days = tk => Math.max(0, Math.ceil((new Date(tk.expires_at) - Date.now()) / 86400000));
+
+function tokenBody() {
+  return `
+      <p class="note">現在外掛是把擷取到的東西交給這一頁，由你登入的身分寫進資料庫——所以這一頁得開著。
+        發一組匯入代碼給外掛，它就能自己送。代碼的限制寫死在資料庫裡：
+        <b>只能寫不能讀</b>、<b>只能寫給你</b>、<b>會過期</b>、<b>你隨時可以撤銷</b>。
+        代碼直送進來的紀錄一律是「自主研究」，要給老師看只能你自己登入後改分類。</p>
+
+      <div class="row">
+        <button class="btn btn--sm" id="mint">發一組新代碼（14 天）</button>
+        ${activeCode() ? `<button class="btn btn--ghost btn--sm" id="sendcode">重新送給外掛</button>` : ""}
+        <span class="note">${esc(codeMsg)}</span>
+      </div>
+
+      ${tokens.length ? `<div class="stream" style="margin-top:10px">${tokens.map(tk => `
+        <article class="turn ${live(tk) ? "" : "turn--fold"}">
+          <div class="turn__head">
+            <span class="seq" style="font-family:var(--mono);letter-spacing:.06em">${esc(tk.code)}</span>
+            <span class="vlabel">${tk.revoked_at ? "已撤銷"
+              : (live(tk) ? `還有 ${days(tk)} 天` : "已過期")}</span>
+            ${tk.code === activeCode() && live(tk) ? `<span class="chip">目前給外掛用的</span>` : ""}
+            ${tk.uses ? `<span class="chip">用過 ${tk.uses} 次 · 寫進 ${tk.turns_written} 段</span>`
+                      : `<span class="chip">還沒用過</span>`}
+            <span class="turn__time">${clock(tk.created_at)} 發出</span>
+          </div>
+          ${live(tk) ? `<div class="row" style="padding:0 14px 12px">
+            <button class="btn btn--ghost btn--sm" data-copycode="${esc(tk.code)}">複製代碼</button>
+            <button class="btn btn--ghost btn--sm" data-revoke="${tk.id}">撤銷</button>
+          </div>` : ""}
+        </article>`).join("")}</div>` : ""}
+
+      <p class="note" style="margin-top:10px">代碼等同於「可以往你的紀錄裡寫東西」的權限。不要貼在公開的地方。
+        覺得不對就按撤銷，下一秒就失效——不用改程式，也不用重設密碼。</p>`;
+}
+
+const defaultOpen = t => needsWhy(t) && !(t.why || "").trim();
+function isOpen(t, i) {
+  const v = foldState[curId + ":" + i];
+  return v === undefined ? defaultOpen(t) : v;
+}
+
+/* 補充說明：可以改，但改了會留痕。
+   鎖死只會逼人隨便寫一句交差；讓人能改、但改過幾次看得到，
+   才是既承認人會想到更好的說法，又不讓紀錄變成事後才編出來的東西。
+   次數與時間由資料庫的觸發器決定，這支程式送什麼都不算數。 */
+function whyMeta(t) {
+  if (!(t.why || "").trim()) return "";
+  const n = t.why_edits || 0;
+  const bits = [];
+  if (n) bits.push(`修改過 ${n} 次`);
+  if (t.why_first_at && n) bits.push(`初次 ${clock(t.why_first_at)}`);
+  bits.push(`${n ? "最後修改" : "寫於"} ${clock(t.why_at || t.why_first_at)}`);
+  return `<span class="why__meta">${bits.join(" · ")}</span>`;
+}
+
+function whyHTML(t) {
+  const has = (t.why || "").trim();
+  if (editWhy === t.id || !has) {
+    return `${has ? "" : `<p class="why__ask">${t.ai.verdict === "choose"
+        ? "你從幾個選項裡挑了一個，但沒說原因。為什麼是這個？"
+        : "這一段你沒有推回去。為什麼接受它？"}</p>`}
+      <textarea data-why="${t.id}" placeholder="一句話就好">${esc(t.why || "")}</textarea>
+      <div class="row">
+        <button class="btn btn--sm" data-savewhy="${t.id}">${has ? "存成新的一版" : "留下這句"}</button>
+        ${has ? `<button class="btn btn--ghost btn--sm" data-cancelwhy="1">取消</button>
+          <span class="note">原文和時間改不了，這一句可以。改了會顯示修改次數。</span>` : ""}
+      </div>`;
+  }
+  return `<p class="why__done"><b>你補的說明</b>${esc(t.why)}</p>
+    <div class="row" style="margin-top:6px">
+      ${whyMeta(t)}
+      <button class="btn btn--ghost btn--sm" data-editwhy="${t.id}">修改</button>
+    </div>`;
+}
+
+function turnHTML(t, i) {
+  const v = t.ai?.verdict;
+  const tone = !v ? "" : (needsWhy(t) ? "turn--flag" : `turn--${V[v].cls}`);
+  const fold = !isOpen(t, i);
+  const head = `<div class="turn__head" data-fold="${i}">
+    <span class="seq">${p2(i + 1)}</span>
+    <span class="vlabel">${v ? V[v].label : "尚未判讀"}</span>
+    ${v === "choose" && t.ai.reasoned ? `<span class="chip">有講選擇的理由</span>` : ""}
+    ${t.opens ? `<span class="chip">老師已查閱</span>` : ""}
+    ${t.via_token ? `<span class="chip">代碼直送</span>` : ""}
+    ${t.produced ? `<span class="chip chip--out">產出 ${esc(t.produced)}</span>` : ""}
+    <span class="turn__time">${clock(t.captured_at)}</span>
+    <span class="fold__more">${fold ? "展開" : "收合"}</span>
+  </div>`;
+
+  if (fold) {
+    const q = (t.q || "").replace(/\s+/g, " ");
+    return `<article class="turn turn--fold ${tone}">${head}
+      <div class="fold" data-fold="${i}">${esc(q.slice(0, 64))}${q.length > 64 ? "…" : ""}</div>
+    </article>`;
+  }
+
+  return `<article class="turn ${tone}">${head}
+    <div class="turn__q"><b>你說</b>${esc(t.q)}</div>
+    <div class="turn__a"><b>AI 回覆 · 擷取當下的原文</b>${esc(t.a)}</div>
+    ${t.ai?.basis ? `<div class="basis"><b>AI 判定依據</b><q>${esc(t.ai.basis)}</q></div>` : ""}
+    ${needsWhy(t) ? `<div class="why">${whyHTML(t)}</div>` : ""}
+  </article>`;
+}
+
+/* ---------- AI 判讀 ---------- */
+const provider = () => localStorage.getItem("jl_provider") || "gemini";
+const hasKey = () => !!(localStorage.getItem("jl_key") || "").trim();
+
+/* 把整份對話交給模型，回傳每一段的判定。兩家的請求格式不同，回來的東西一樣。 */
+async function askModel(prompt) {
+  const key = localStorage.getItem("jl_key").trim();
+
+  if (provider() === "gemini") {
+    // Google 會汰換型號，而且會在 404 的訊息裡直接說要改用哪一個。
+    // 所以遇到 404 就把新型號讀出來、記起來、重試一次，下次不用再改程式。
+    const callGemini = async (model) => {
+      const url = "https://generativelanguage.googleapis.com/v1beta/models/"
+        + model + ":generateContent?key=" + encodeURIComponent(key);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0, responseMimeType: "application/json" }
+        })
+      });
+      return { res, body: res.ok ? null : await res.text() };
+    };
+
+    let model = localStorage.getItem("jl_gemini_model") || "gemini-3.6-flash";
+    let { res, body } = await callGemini(model);
+
+    if (!res.ok && res.status === 404) {
+      // 訊息長這樣：Please update your code to use models/gemini-3.6-flash
+      const m = (body || "").match(/use\s+models\/([A-Za-z0-9.\-]+)/);
+      if (m && m[1] && m[1] !== model) {
+        model = m[1];
+        console.log("[判斷紀錄] Gemini 型號已更新為", model);
+        ({ res, body } = await callGemini(model));
+        if (res.ok) localStorage.setItem("jl_gemini_model", model);
+      }
+    }
+    if (!res.ok) throw new Error("Gemini 回 " + res.status + "：" + (body || "").slice(0, 200));
+
+    const out = await res.json();
+    return (out.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
+  }
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-5", max_tokens: 2000,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+  if (!res.ok) throw new Error("Anthropic 回 " + res.status + "：" + (await res.text()).slice(0, 200));
+  const out = await res.json();
+  return (out.content || []).map(c => c.text || "").join("");
+}
+
+async function runAnalysis() {
+  if (!turns.length) return;
+  if (!hasKey()) {
+    msg = "還沒填 API 金鑰——到最下面的「設定」填一組，Gemini 那家是免費的。";
+    document.getElementById("keybox")?.setAttribute("open", "");
+    render();
+    document.getElementById("keybox")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  busy = true; msg = "判讀中，可能要半分鐘…"; render();
+  const transcript = turns.map((t, i) =>
+    `[${i + 1}] 學生說：${t.q}\n    AI 回覆：${t.a}`).join("\n\n");
+  const prompt =
+`你要判讀一份「學生與 AI 的對話紀錄」，判斷學生對 AI 的每一則回覆是照單全收，還是有推回去。
+
+判準（看的是「下一則學生說了什麼」）：
+- push（有推回去）：學生指出問題、要求修改、限縮範圍、補條件。
+- reject（否決不用）：學生明確不採用這個方向，換一個做法。
+- choose（做了選擇）：AI 給了兩個以上的選項，學生從中挑了一個。挑選本身就是判斷，不要判成 adopt。
+- adopt（照單全收）：學生沒有質疑也沒有修正，直接接受或跳到下一件事。
+
+另外對每一筆標 reasoned：學生那一句有沒有講出理由或取捨（只說「好」「就這個」不算）。verdict 是 choose 時這欄最重要，其他一律 true。
+
+對話紀錄：
+${transcript}
+
+只輸出 JSON，不要有其他文字：
+{"items":[{"i":1,"verdict":"push","reasoned":true,"basis":"引用學生原話當證據，25字內"}]}`;
+
+  try {
+    const text = await askModel(prompt);
+    const json = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
+    const items = Array.isArray(json.items) ? json.items : [];
+
+    for (const it of items) {
+      const t = turns[(it.i | 0) - 1];
+      if (!t || !V[it.verdict]) continue;
+      const ai = { verdict: it.verdict, reasoned: it.reasoned !== false,
+                   basis: String(it.basis || ""), judged_at: new Date().toISOString() };
+      await sb.from("turns").update({ ai }).eq("id", t.id);
+      t.ai = ai;
+    }
+    msg = `判讀完成，共 ${items.length} 段。`;
+  } catch (e) {
+    msg = "判讀失敗：" + e.message;
+  }
+  busy = false; render();
+}
+
+/* ---------- 互動 ---------- */
+document.addEventListener("click", async (e) => {
+  const t = e.target;
+
+  const tab = t.closest("[data-tab]");
+  if (tab) { authTab = tab.dataset.tab; msg = ""; render(); return; }
+
+  if (t.id === "enter")  { view = "gate"; authTab = "up"; msg = ""; render(); return; }
+  if (t.id === "enter2") { view = "gate"; authTab = "in"; msg = ""; render(); return; }
+  if (t.id === "back")   { view = "land"; msg = ""; render(); return; }
+
+  if (t.id === "go") {
+    const email = document.getElementById("email").value.trim();
+    const pw = document.getElementById("pw").value;
+    const name = document.getElementById("name")?.value.trim() || "";
+    if (!email || !pw) { msg = "Email 和密碼都要填。"; render(); return; }
+    busy = true; msg = ""; render();
+    const r = authTab === "up"
+      ? await sb.auth.signUp({ email, password: pw,
+          options: { data: { display_name: name, role: signRole } } })
+      : await sb.auth.signInWithPassword({ email, password: pw });
+    busy = false;
+    if (r.error) { msg = r.error.message; render(); return; }
+    if (!r.data.session) { msg = "帳號建好了，請到信箱點確認信後再登入。"; render(); return; }
+    await boot();
+    return;
+  }
+
+  if (t.id === "out") { await sb.auth.signOut(); me = null; logs = []; turns = [];
+    view = "land"; announceOwner(); render(); return; }
+
+  if (t.id === "paste") {
+    try {
+      const raw = await navigator.clipboard.readText();
+      const data = JSON.parse(raw);
+      const r = Array.isArray(data) ? await ingestMany(data) : await ingest(data);
+      importMsg = r.msg;
+      if (r.changed) await loadAll();
+    } catch (err) { importMsg = "剪貼簿裡不是有效的 JSON。"; }
+    render(); return;
+  }
+
+  if (t.id === "pickfile") { document.getElementById("file")?.click(); return; }
+
+  if (t.id === "foldall") {
+    const open = turns.some((x, i) => isOpen(x, i));
+    turns.forEach((x, i) => { foldState[curId + ":" + i] = !open; });
+    render(); return;
+  }
+  const fd = t.closest("[data-fold]");
+  if (fd) { const i = Number(fd.dataset.fold);
+    foldState[curId + ":" + i] = !isOpen(turns[i], i); render(); return; }
+
+  const sc = t.closest("#scope button");
+  if (sc) {
+    const log = cur(), to = sc.dataset.scope;
+    if (log && to !== log.scope) {
+      const entry = { from: log.scope, to, at: new Date().toISOString() };
+      const scope_log = [...(log.scope_log || []), entry];
+      await sb.from("logs").update({ scope: to, scope_log }).eq("id", log.id);
+      log.scope = to; log.scope_log = scope_log;
+      render();
+    }
+    return;
+  }
+
+  if (t.id === "setbtn") {
+    settingsOpen = !settingsOpen;
+    if (!settingsOpen) setTab = "";
+    render(); return;
+  }
+
+  const st = t.closest("[data-settab]");
+  if (st) {
+    setTab = setTab === st.dataset.settab ? "" : st.dataset.settab;
+    msg = ""; catMsg = ""; codeMsg = "";
+    render(); return;
+  }
+
+  // 點到面板外面就收起來。面板裡面的操作照常，不要動它。
+  if (settingsOpen && !t.closest("#setpanel")) { settingsOpen = false; setTab = ""; justClosed = true; }
+
+  const sr = t.closest("[data-srole]");
+  if (sr) { signRole = sr.dataset.srole; render(); return; }
+
+  const rr = t.closest("[data-setrole]");
+  if (rr) {
+    const to = rr.dataset.setrole;
+    if (!confirm(to === "teacher"
+      ? "改成老師？\n你會看到班級那一側，學生那一側（自己的紀錄、外掛匯入）會收起來。\n你已經有的紀錄不會被刪，改回來就看得到。"
+      : "改成學生？\n你開的課不會消失，但你不會再看到老師那一側。")) return;
+    const { error } = await sb.from("profiles").update({ role: to }).eq("id", me.id);
+    if (error) { msg = error.message; render(); return; }
+    profile.role = to;
+    if (to === "teacher" && !tCourse && teaching.length) await loadCourse(teaching[0].id);
+    msg = ""; render(); return;
+  }
+
+  if (t.id === "mkcourse") {
+    const name = (document.getElementById("cname")?.value || "").trim();
+    const sem  = (document.getElementById("csem")?.value || "").trim();
+    if (!name) { document.getElementById("cname")?.focus(); return; }
+    const { data, error } = await sb.rpc("create_course", { _name: name, _semester: sem });
+    if (error) {
+      tMsg = error.message.includes("does not exist")
+        ? "資料庫還沒有這個功能。把 schema-teacher.sql 貼到 Supabase 執行一次。"
+        : error.message;
+      render(); return;
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    tMsg = `開好了。課程代碼 ${row.join_code}，把它給學生。`;
+    await loadAll(); await loadCourse(row.id); render(); return;
+  }
+
+  const ts1 = t.closest("[data-tstu]");
+  if (ts1) { await openStudent(ts1.dataset.tstu); render(); return; }
+
+  if (t.id === "tback") { tWho = null; tLogId = null; tTurns = []; render(); return; }
+
+  // 展開原文：先把「誰在什麼時候展開的」記下來，再顯示。
+  // 順序是故意的——留痕失敗就不給看，不然留痕只是裝飾。
+  const to = t.closest("[data-topen]");
+  if (to) {
+    const id = to.dataset.topen;
+    const { error } = await sb.rpc("record_open", { _turn: id });
+    if (error) { tMsg = "留痕失敗，所以沒有展開：" + error.message; render(); return; }
+    tOpen[id] = true;
+    const row = tTurns.find(x => x.id === id);
+    if (row) row.opens = (row.opens || 0) + 1;
+    render(); return;
+  }
+
+  const cf = t.closest("[data-cfold]");
+  if (cf) {
+    const key = cf.dataset.cfold;
+    const hasCur = logs.some(l => (l.category_id || "_none") === key && l.id === curId)
+      || (key === "_none" && logs.some(l => !l.category_id && l.id === curId));
+    catFold[key] = !groupOpen(key, hasCur);
+    saveFold(); render(); return;
+  }
+
+  const gl = t.closest("[data-golog]");
+  if (gl) { curId = gl.dataset.golog; await loadTurns(); render(); return; }
+
+  if (t.id === "addcat") {
+    const name = (document.getElementById("newcat")?.value || "").trim();
+    if (!name) { document.getElementById("newcat")?.focus(); return; }
+    const { data, error } = await sb.from("categories")
+      .insert({ owner: me.id, name }).select().single();
+    if (error) {
+      catMsg = error.code === "23505" ? `已經有一個叫「${name}」的分類了。` : error.message;
+      render(); return;
+    }
+    cats.push(data); cats.sort((a, b) => a.name.localeCompare(b.name));
+    const log = cur();
+    if (log) {                       // 新增完直接把目前這份放進去，少一個動作
+      await sb.from("logs").update({ category_id: data.id }).eq("id", log.id);
+      log.category_id = data.id;
+    }
+    catMsg = `建好了：${name}。`;
+    render(); return;
+  }
+
+  const dc = t.closest("[data-delcat]");
+  if (dc) {
+    const c = cats.find(x => x.id === dc.dataset.delcat);
+    const n = logs.filter(l => l.category_id === c?.id).length;
+    if (!confirm(`刪掉分類「${c?.name}」？\n裡面的 ${n} 份紀錄不會被刪，只會變回未分類。`)) return;
+    const { error } = await sb.from("categories").delete().eq("id", dc.dataset.delcat);
+    catMsg = error ? error.message : `分類刪掉了，${n} 份紀錄變回未分類。`;
+    await loadAll(); render(); return;
+  }
+
+  if (t.id === "tocan") {
+    const log = cur(); if (!log) return;
+    if (log.scope === "course") {
+      catMsg = "這份掛在課程底下，老師看得到，不能直接丟。要丟請先把上面改成「自主研究」——"
+             + "那個改動會留在紀錄上，老師看得到你把它移走了。";
+      render(); return;
+    }
+    if (!confirm(`把「${log.title}」丟進垃圾桶？\n14 天內都還原得回來，之後才真的刪掉。`)) return;
+    const { error } = await sb.from("logs")
+      .update({ deleted_at: new Date().toISOString() }).eq("id", log.id);
+    if (error) { catMsg = error.message; render(); return; }
+    curId = null; catMsg = "丟進垃圾桶了，14 天內還原得回來。";
+    await loadAll(); await loadTurns(); render(); return;
+  }
+
+  const rs = t.closest("[data-restore]");
+  if (rs) {
+    await sb.from("logs").update({ deleted_at: null }).eq("id", rs.dataset.restore);
+    curId = rs.dataset.restore;
+    catMsg = "還原了。";
+    await loadAll(); await loadTurns(); render(); return;
+  }
+
+  const pg = t.closest("[data-purge]");
+  if (pg) {
+    const l = trash.find(x => x.id === pg.dataset.purge);
+    if (!confirm(`永久刪除「${l?.title}」？\n這一份連同裡面所有段落都會消失，而且救不回來。`)) return;
+    await sb.from("logs").delete().eq("id", pg.dataset.purge);
+    catMsg = "已永久刪除。";
+    await loadAll(); render(); return;
+  }
+
+  if (t.id === "mint") {
+    busy = true; codeMsg = "產生中…"; render();
+    const { data, error } = await sb.rpc("mint_import_code", { _days: 14, _label: "Chrome 外掛" });
+    busy = false;
+    if (error) {
+      codeMsg = error.message.includes("does not exist")
+        ? "資料庫還沒有這個功能。把 schema-import-code.sql 貼到 Supabase 執行一次。"
+        : error.message;
+      render(); return;
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    localStorage.setItem("jl_code", row.code);
+    announceEndpoint();
+    codeMsg = `發好了：${row.code}，已經送給外掛。從現在起這一頁關著也會收到資料。`;
+    await loadAll(); render(); return;
+  }
+
+  if (t.id === "sendcode") { announceEndpoint();
+    codeMsg = "已經再送一次給外掛。外掛視窗上應該會顯示「直送已設定」。"; render(); return; }
+
+  const cc = t.closest("[data-copycode]");
+  if (cc) {
+    await navigator.clipboard.writeText(cc.dataset.copycode);
+    codeMsg = "複製好了。"; render(); return;
+  }
+
+  const rv = t.closest("[data-revoke]");
+  if (rv) {
+    const tk = tokens.find(x => x.id === rv.dataset.revoke);
+    if (!confirm(`撤銷 ${tk?.code}？之後拿這組代碼就寫不進來了。已經寫進來的紀錄不會動。`)) return;
+    const { error } = await sb.rpc("revoke_import_code", { _id: rv.dataset.revoke });
+    if (!error && tk && tk.code === activeCode()) {
+      localStorage.removeItem("jl_code");
+      announceEndpoint();                       // 也叫外掛把它丟掉
+    }
+    codeMsg = error ? error.message : "撤銷了。";
+    await loadAll(); render(); return;
+  }
+
+  if (t.id === "join") {
+    const code = document.getElementById("code").value.trim();
+    if (!code) return;
+    const { error } = await sb.rpc("join_course", { _code: code });
+    msg = error ? error.message : "加入了。";
+    if (!error) await loadAll();
+    render(); return;
+  }
+
+  if (t.id === "savekey") {
+    localStorage.setItem("jl_key", document.getElementById("key").value.trim());
+    localStorage.setItem("jl_provider", document.getElementById("prov").value);
+    msg = hasKey() ? "金鑰存好了（只存在這台電腦）。可以按上面的「判讀這份紀錄」了。"
+                   : "金鑰是空的。";
+    render(); return;
+  }
+  if (t.id === "run") { runAnalysis(); return; }
+
+  const ew = t.closest("[data-editwhy]");
+  if (ew) { editWhy = ew.dataset.editwhy; render(); return; }
+  if (t.closest("[data-cancelwhy]")) { editWhy = null; render(); return; }
+
+  const sw = t.closest("[data-savewhy]");
+  if (sw) {
+    const id = sw.dataset.savewhy;
+    const box = document.querySelector(`[data-why="${id}"]`);
+    const val = (box?.value || "").trim();
+    if (!val) { box?.focus(); return; }
+    // 只送 why。次數與時間由資料庫的觸發器算，前端送了也不算數。
+    const { data, error } = await sb.from("turns")
+      .update({ why: val }).eq("id", id).select().single();
+    if (error) { msg = error.message; render(); return; }
+    const i = turns.findIndex(x => x.id === id);
+    if (i >= 0 && data) turns[i] = data;
+    editWhy = null;
+    render(); return;
+  }
+
+  // 走到這裡代表這一下沒有觸發任何功能。如果剛剛把設定收起來了，重畫一次。
+  if (justClosed) { justClosed = false; render(); }
+});
+
+let justClosed = false;
+
+/* 日曆格子的提示。滑過才出現，不搶畫面。 */
+document.addEventListener("mouseover", (e) => {
+  const c = e.target.closest?.("[data-cal]");
+  const tip = document.getElementById("caltip");
+  if (!tip) return;
+  if (!c) { tip.hidden = true; return; }
+  const d = new Date(c.dataset.cal + "T00:00:00");
+  const n = Number(c.dataset.n);
+  tip.textContent = `${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）· ${
+    n ? n + " 段" : "沒有紀錄"}`;
+  const box = c.getBoundingClientRect();
+  const host = tip.parentElement.getBoundingClientRect();
+  tip.style.left = (box.left - host.left + box.width / 2) + "px";
+  tip.style.top  = (box.top - host.top) + "px";
+  tip.hidden = false;
+});
+
+/* Esc 收起設定 */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && settingsOpen) { settingsOpen = false; setTab = ""; render(); }
+});
+
+/* 這兩格打完按 Enter 就送出，不用再移到旁邊按按鈕 */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  if (e.target.id === "newcat") { e.preventDefault(); document.getElementById("addcat")?.click(); }
+  if (e.target.id === "code")   { e.preventDefault(); document.getElementById("join")?.click(); }
+});
+
+/* 點進課程代碼欄位才解除唯讀，避開 Chrome 的自動填入 */
+document.addEventListener("focusin", (e) => {
+  if (e.target.id === "code" || e.target.id === "newcat") e.target.removeAttribute("readonly");
+});
+
+document.addEventListener("change", async (e) => {
+  if (e.target.id === "file") {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    importMsg = "讀取檔案中…"; render();
+    try {
+      const data = JSON.parse(await f.text());
+      const r = Array.isArray(data) ? await ingestMany(data) : await ingest(data);
+      importMsg = r.msg;
+      if (r.changed) await loadAll();
+    } catch (err) { importMsg = "這個檔案不是有效的 JSON：" + err.message; }
+    e.target.value = "";
+    render(); return;
+  }
+  if (e.target.id === "prov") {
+    localStorage.setItem("jl_provider", e.target.value); msg = ""; render(); return;
+  }
+  if (e.target.id === "tpick") { await loadCourse(e.target.value || null); render(); return; }
+  if (e.target.id === "tlog")  {
+    if (e.target.value) await openStudentLog(e.target.value);
+    else { tLogId = null; tTurns = []; }
+    render(); return;
+  }
+  if (e.target.id === "setcat") {
+    const log = cur(); if (!log) return;
+    const cid = e.target.value || null;
+    await sb.from("logs").update({ category_id: cid }).eq("id", log.id);
+    log.category_id = cid;
+    catMsg = cid ? `歸到「${catName(cid)}」。` : "移出分類了。";
+    render(); return;
+  }
+  if (e.target.id === "pick") { curId = e.target.value; await loadTurns(); render(); }
+  if (e.target.id === "assign") {
+    const log = cur(); if (!log) return;
+    const cid = e.target.value || null;
+    await sb.from("logs").update({ course_id: cid }).eq("id", log.id);
+    log.course_id = cid; render();
+  }
+});
+
+/* 外掛直送：外掛把擷取到的對話 postMessage 進來，由這一頁用你的身分寫進資料庫。
+   外掛全程不持有任何帳號或金鑰。 */
+let bridgeQueue = Promise.resolve();
+window.addEventListener("message", (e) => {
+  const d = e.data;
+  if (!d || d.type !== "judgment-log-capture" || !Array.isArray(d.logs) || !me) return;
+  bridgeAt = Date.now();
+  bridgeQueue = bridgeQueue.then(async () => {
+    let changed = false, last = "";
+    for (const l of d.logs) {
+      const r = await ingest(l, { quiet: true });
+      if (r.changed) { changed = true; last = r.msg; }
+    }
+    if (changed) { importMsg = "外掛直送：" + last; await loadAll(); render(); }
+    else { const el = document.getElementById("bridge");
+      if (el) el.innerHTML = `<span class="livedot"></span>外掛已連線，${clock(bridgeAt)} 最後送達`; }
+  });
+});
+
+/* 告訴外掛「現在登入的是誰」。外掛拿這個在擷取當下蓋上歸屬，
+   所以同一台電腦換人用，不會記到上一個人頭上。傳的只有 id 和顯示名稱，沒有任何金鑰。 */
+function announceOwner() {
+  window.postMessage({
+    type: "judgment-log-owner",
+    user: me ? { id: me.id, name: profile?.display_name || me.email } : null
+  }, "*");
+}
+
+/* 把匯入代碼交給外掛，讓它在這一頁關著的時候也能自己送資料進來。
+   給出去的是「網址 + 公開金鑰 + 代碼」，沒有帳號、沒有密碼、沒有 session。
+   拿到這三樣只能呼叫 redeem_import_code，寫給代碼的主人，讀不到任何東西。 */
+function announceEndpoint() {
+  const code = activeCode();
+  window.postMessage({
+    type: "judgment-log-endpoint",
+    endpoint: (code && me) ? {
+      url: cfg.SUPABASE_URL, key: cfg.SUPABASE_ANON_KEY,
+      code, owner: me.id, at: Date.now()
+    } : null
+  }, "*");
+}
+
+setInterval(() => { announceOwner(); if (me) announceEndpoint(); }, 4000);
+
+/* 保險用的輪詢。比對過才重畫，沒變就什麼都不做。 */
+setInterval(refreshIfChanged, 6000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) refreshIfChanged();          // 切回這一頁就馬上對一次
+});
+
+/* Realtime：資料庫一有新段落就推過來。
+   如果 Supabase 那邊沒把這兩張表加進發布清單，這段不會有任何作用，
+   也不會壞——上面的輪詢仍然會在 6 秒內補上。 */
+function watchLive() {
+  try {
+    sb.channel("jl-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "turns" }, refreshIfChanged)
+      .on("postgres_changes", { event: "*", schema: "public", table: "logs" },  refreshIfChanged)
+      .subscribe();
+  } catch (e) { /* 沒有 Realtime 就算了，還有輪詢 */ }
+}
+
+/* ---------- 啟動 ---------- */
+async function boot() {
+  const { data } = await sb.auth.getSession();
+  me = data.session?.user || null;
+  // 垃圾桶超過 14 天的，在這裡真的清掉。不需要排程服務，載入時順手做。
+  if (me) { try { await sb.rpc("purge_trash"); } catch (e) {} }
+  if (me) await loadAll();
+  // 老師登入就直接落在他的第一門課上，不用再點一次
+  if (me && isTeacher() && teaching.length && !tCourse) await loadCourse(teaching[0].id);
+  render();
+  announceOwner();
+  if (me) { announceEndpoint(); watchLive(); }
+}
+sb.auth.onAuthStateChange((_e, s) => { if (!s) { me = null; render(); } });
+boot();
+</script>
+</body>
+</html>
