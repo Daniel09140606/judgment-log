@@ -197,6 +197,9 @@ label.f{display:block;font-size:13px;font-weight:500;margin:14px 0 5px}
 .vbar i{display:block;min-width:3px}
 .vkey{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--muted)}
 .vkey span{display:flex;gap:6px;align-items:center}
+/* 時間分布：一天一根。擠在截止前跟整學期分散，一眼看得出來。 */
+.spark{display:flex;align-items:flex-end;gap:2px;height:44px}
+.spark i{display:block;flex:1;min-width:2px;background:var(--accent);border-radius:1px}
 .vkey i{width:7px;height:7px;border-radius:99px;display:inline-block}
 /* 四年的形狀。
    單一色相、由淺到深的順序色階（不是分類色），深淺只代表那天記了幾段。
@@ -319,8 +322,16 @@ let teaching = [];                // 我開的課
    後者是 logs / turns 的資料庫政策在管，勾了老師不會多看到任何一個人。 */
 let signRole = "student";         // 註冊表單上選的
 const isTeacher = () => profile?.role === "teacher";
-let tCourse = null, tInfo = null, tRoster = [], tWho = null, tLogs = [], tTurns = [];
+let tCourse = null, tRoster = [], tWho = null, tLogs = [], tTurns = [];
 let tLogId = null, tOpen = {}, tMsg = "";
+let tCourseLogs = [];             // 這門課收到的紀錄（所有學生的）
+let tComments = [], tReqs = [];   // 評語、查看請求
+let tDays = {};                   // 全班的時間分布
+let tFold = { ok: true, none: true };   // 「一切正常」「還沒交」預設收起來
+let myReqs = [];                  // 學生端：老師對我發的查看請求
+let myComments = [];              // 學生端：老師寫給我的評語
+let joinPick = null;              // 學生端：剛加入課程，正在勾要交哪幾份
+let joinSel = {};                 // 勾選狀態
 let tokens = [];                  // 我發出去的匯入代碼
 let cats = [];                    // 我自己建的分類
 let turnCount = {};               // 每份紀錄有幾段，導覽上要顯示
@@ -364,6 +375,15 @@ async function loadAll() {
   teaching = allC.filter(c => c.teacher === me.id);
   courses  = allC.filter(c => c.teacher !== me.id);
   profile = pf || null; tokens = tk || []; cats = ct || [];
+
+  // 學生端：老師對我發的查看請求、老師寫給我的評語
+  if (profile?.role !== "teacher") {
+    const [{ data: rq }, { data: cm }] = await Promise.all([
+      sb.from("view_requests").select("*").eq("student", me.id),
+      sb.from("course_comments").select("*").eq("student", me.id)
+    ]);
+    myReqs = rq || []; myComments = cm || [];
+  }
 
   // 每份紀錄的段數，以及每一天的段數。只取兩欄，不把內容整批拉下來。
   const { data: ids } = await sb.from("turns").select("log_id,captured_at");
@@ -516,57 +536,53 @@ async function ingest(payload, opts = {}) {
    這一側只能讀，而且讀得到的東西由資料庫決定，不是由這支程式決定：
    只有「掛在你課底下」而且「學生標成課程作業」的紀錄。
    學生標成自主研究的，這裡查不到——連你是老師也一樣。 */
+/* 老師端一律走 course_turns 這個視圖，不走 turns。
+   這不是寫法偏好——turns 的老師讀取政策已經在 sql/11 被關掉了，
+   直接查會一列都拿不到。原文要不要給看是資料庫決定的，不是這支程式。 */
 async function loadCourse(cid) {
   tCourse = cid; tWho = null; tLogId = null; tLogs = []; tTurns = []; tOpen = {};
-  if (!cid) { tInfo = null; tRoster = []; return; }
+  tComments = []; tReqs = []; tDays = {};
+  if (!cid) { tRoster = []; return; }
 
-  const { data: info } = await sb.rpc("course_overview", { _course: cid });
-  tInfo = info || null;
-
-  const [{ data: en }, { data: ls }] = await Promise.all([
-    sb.from("enrollments").select("*").eq("course_id", cid),
-    sb.from("logs").select("*").eq("course_id", cid)
+  const [{ data: roster }, { data: ls }, { data: rq }] = await Promise.all([
+    sb.rpc("class_roster", { _course: cid }),
+    sb.from("logs").select("*").eq("course_id", cid),
+    sb.from("view_requests").select("*").eq("course_id", cid)
   ]);
-  const ids = (en || []).map(e => e.student);
-  const { data: ps } = ids.length
-    ? await sb.from("profiles").select("*").in("id", ids) : { data: [] };
+  tRoster = roster || [];
+  tCourseLogs = (ls || []).filter(l => l.scope === "course" && !l.deleted_at);
+  tReqs = rq || [];
 
-  const mine = (ls || []).filter(l => l.scope === "course" && !l.deleted_at);
-  const logIds = mine.map(l => l.id);
-  const { data: ts } = logIds.length
-    ? await sb.from("turns").select("*").in("log_id", logIds) : { data: [] };
-
-  const byLog = {};
-  (ts || []).forEach(t => { (byLog[t.log_id] = byLog[t.log_id] || []).push(t); });
-
-  tRoster = ids.map(id => {
-    const ps1 = (ps || []).find(p => p.id === id);
-    const his = mine.filter(l => l.owner === id);
-    const turns = his.flatMap(l => byLog[l.id] || []);
-    const cnt = { adopt: 0, push: 0, reject: 0, choose: 0, none: 0 };
-    turns.forEach(t => { const v = t.ai?.verdict; cnt[v ? v : "none"]++; });
-    return {
-      id, name: ps1?.display_name || "（未命名）",
-      logs: his, turns: turns.length, cnt,
-      pending: turns.filter(t => needsWhy(t) && !(t.why || "").trim()).length,
-      opens: turns.reduce((n, t) => n + (t.opens || 0), 0)
-    };
-  }).sort((a, b) => b.turns - a.turns);
+  // 全班的時間分布。只取時間欄，不把內容整批拉下來。
+  const { data: when } = await sb.from("course_turns").select("captured_at,owner");
+  tDays = {};
+  (when || []).forEach(r => {
+    const k = dayKey(r.captured_at);
+    if (k) tDays[k] = (tDays[k] || 0) + 1;
+  });
 }
 
 async function openStudent(id) {
   tWho = id; tLogId = null; tTurns = [];
-  const r = tRoster.find(x => x.id === id);
-  tLogs = r ? r.logs : [];
-  if (tLogs.length === 1) await openStudentLog(tLogs[0].id);
+  tLogs = tCourseLogs.filter(l => l.owner === id);
+
+  const ids = tLogs.map(l => l.id);
+  const [{ data: ts }, { data: cm }] = await Promise.all([
+    ids.length ? sb.from("course_turns").select("*").in("log_id", ids)
+                   .order("captured_at", { ascending: true })
+               : Promise.resolve({ data: [] }),
+    sb.from("course_comments").select("*").eq("course_id", tCourse).eq("student", id)
+      .order("created_at", { ascending: true })
+  ]);
+  tTurns = ts || [];
+  tComments = cm || [];
+  if (tLogs.length === 1) tLogId = tLogs[0].id;
 }
 
-async function openStudentLog(id) {
-  tLogId = id;
-  const { data } = await sb.from("turns").select("*").eq("log_id", id)
-    .order("captured_at", { ascending: true });
-  tTurns = data || [];
-}
+function openStudentLog(id) { tLogId = id; }
+
+/* 這個學生在這一份紀錄裡的那幾段 */
+const logTurns = () => tTurns.filter(t => t.log_id === tLogId);
 
 /* 追問建議：從紀錄本身的缺口長出來的，不是評分。
    老師拿到的是「該問什麼」，因為能不能答得出來，才是 AI 代替不了的部分。 */
@@ -597,75 +613,144 @@ function followups(ts) {
   return out.slice(0, 4);
 }
 
+/* 老師端四層：課程 → 班級（總覽＋名單）→ 學生 → 單輪。
+   每一層只做一件事，因為老師的腦袋一次也只裝得下一件事。 */
 function viewTeacher() {
   const c = teaching.find(x => x.id === tCourse) || null;
+  return `${mastheadHTML()}
+    ${!c ? viewCourseList() : (tWho ? viewStudent() : viewClass(c))}
+    <p class="foot">老師端只能讀，不能改學生的紀錄。原文預設看不到——
+      那是資料庫擋的，不是這個畫面沒做按鈕。</p>`;
+}
 
+/* ① 我的課程 */
+function viewCourseList() {
   return `
-  ${mastheadHTML()}
-
   <section class="sec">
     <span class="sec__label">Teaching</span>
-    <h2 class="sec__title">老師檢視</h2>
-    <p class="sec__hint">你只看得到<b>掛在你課底下</b>而且<b>學生標成課程作業</b>的紀錄。
-      學生標成自主研究的，你在資料庫那一層就查不到——這不是畫面藏起來，是查詢被擋掉。
-      另外，你每展開一次原文，學生在他自己的頁面上都看得到。</p>
+    <h2 class="sec__title">我的課程</h2>
+    <p class="sec__hint">你只看得到學生<b>主動交給這門課</b>的紀錄。
+      沒交的不會出現在這裡，也不會顯示數量。</p>
 
-    <div class="row">
-      ${teaching.length ? `<select id="tpick" style="max-width:260px">
-        <option value="">選一門課</option>
-        ${teaching.map(x => `<option value="${x.id}" ${x.id === tCourse ? "selected" : ""}>${
-          esc(x.name)}${x.semester ? " · " + esc(x.semester) : ""}</option>`).join("")}
-      </select>` : ""}
+    ${teaching.length ? `<div class="stream">${teaching.map(x => {
+      return `<article class="turn">
+        <div class="turn__head">
+          <span class="vlabel">${esc(x.name)}</span>
+          ${x.semester ? `<span class="chip">${esc(x.semester)}</span>` : ""}
+          <span class="turn__time" style="font-family:var(--mono);letter-spacing:.08em">${esc(x.join_code)}</span>
+        </div>
+        <div class="row" style="padding:0 16px 13px;margin-top:0">
+          <button class="btn btn--sm" data-tcourse="${x.id}">進入班級</button>
+          <button class="btn btn--ghost btn--sm" data-copycode="${esc(x.join_code)}">複製課程代碼</button>
+        </div>
+      </article>`; }).join("")}</div>`
+      : `<p class="empty">還沒有開課。下面開一門，把課程代碼給學生。</p>`}
+
+    <div class="row" style="margin-top:16px">
       <input id="cname" placeholder="課程名稱" style="max-width:180px" autocomplete="off">
-      <input id="csem" placeholder="學期，例如 114-1" style="max-width:150px" autocomplete="off">
+      <input id="csem" placeholder="學期，例如 115-1" style="max-width:150px" autocomplete="off">
       <button class="btn btn--sm" id="mkcourse">開一門課</button>
       <span class="note">${esc(tMsg)}</span>
     </div>
-
-    ${c ? `<div class="scopebar">
-      <span class="scopebar__lab">課程代碼</span>
-      <b style="font-family:var(--mono);letter-spacing:.1em;font-size:15px;color:var(--ink)">${esc(c.join_code)}</b>
-      <button class="btn btn--ghost btn--sm" data-copycode="${esc(c.join_code)}">複製</button>
-      <span class="scopebar__hint">學生在自己的頁面輸入這組代碼就能加入。</span>
-    </div>` : ""}
-
-    ${tInfo ? `<div class="metrics">
-      <div class="metric"><b>${tInfo.students}</b><span>班上人數</span></div>
-      <div class="metric"><b>${tInfo.submitters}</b><span>有交紀錄</span></div>
-      <div class="metric"><b>${tInfo.visible}</b><span>你看得到的紀錄</span></div>
-      <div class="metric metric--dim"><b>${tInfo.hidden}</b><span>學生標成自主研究，你看不到</span></div>
-    </div>
-    <p class="note" style="margin-top:8px">最後那個數字是故意給你的。
-      知道「有東西我看不到」，比以為自己看到了全部要安全。</p>` : ""}
-  </section>
-
-  ${c ? (tWho ? viewStudent() : viewRoster()) : ""}
-
-  <p class="foot">老師端只能讀，不能改學生的紀錄。你讀了哪一段、讀了幾次，學生看得到。</p>`;
+  </section>`;
 }
 
-function viewRoster() {
-  if (!tRoster.length)
-    return `<p class="empty">還沒有人加入這門課。把上面那組課程代碼給學生。</p>`;
+/* ② 班級：上面全班總覽，下面分組名單 */
+function viewClass(c) {
+  const sum = { adopt: 0, push: 0, reject: 0, choose: 0, none: 0 };
+  let total = 0;
+  tRoster.forEach(s => {
+    sum.adopt += +s.adopt; sum.push += +s.pushback;
+    sum.reject += +s.reject; sum.choose += +s.choose; sum.none += +s.unjudged;
+    total += +s.turns_total;
+  });
+
+  const flagged = tRoster.filter(s => (s.flags || []).length && +s.logs_submitted > 0);
+  const nothing = tRoster.filter(s => +s.logs_submitted === 0);
+  const fine    = tRoster.filter(s => !(s.flags || []).length && +s.logs_submitted > 0);
+
   return `
   <section class="sec">
-    <span class="sec__label">Roster</span>
-    <h2 class="sec__title">班級 ${tRoster.length} 人</h2>
-    <div class="stream">${tRoster.map(s => `
-      <article class="turn">
-        <div class="turn__head">
-          <span class="vlabel">${esc(s.name)}</span>
-          <span class="chip">${s.logs.length} 份 · ${s.turns} 段</span>
-          ${s.pending ? `<span class="chip" style="color:var(--adopt)">${s.pending} 段待補說明</span>` : ""}
-          ${s.opens ? `<span class="chip">你查閱過</span>` : ""}
-          <span class="turn__time">${s.turns ? "" : "還沒有內容"}</span>
-        </div>
-        ${s.turns ? `<div class="turn__q" style="padding-top:10px">${verdictBar(s.cnt, s.turns)}</div>` : ""}
-        <div class="row" style="padding:0 16px 13px;margin-top:0">
-          <button class="btn btn--ghost btn--sm" data-tstu="${s.id}">看他的紀錄</button>
-        </div>
-      </article>`).join("")}</div>
+    <div class="row" style="margin-bottom:6px">
+      <button class="btn btn--ghost btn--sm" id="tcback">← 我的課程</button>
+      <span class="note" style="font-family:var(--mono);letter-spacing:.08em">${esc(c.join_code)}</span>
+      <button class="btn btn--ghost btn--sm" data-copycode="${esc(c.join_code)}">複製代碼</button>
+    </div>
+    <span class="sec__label">Class</span>
+    <h2 class="sec__title">${esc(c.name)}${c.semester ? " · " + esc(c.semester) : ""}</h2>
+    <p class="sec__hint">${tRoster.length} 人已加入。這裡只會出現學生主動交給這門課的紀錄——
+      沒交的不會出現，也不會顯示數量。</p>
+
+    ${total ? `<div class="box" style="margin-top:14px"><div class="body" style="padding-top:16px">
+      <span class="sec__label">Overview</span>
+      <h3 class="sec__title" style="font-size:16px">全班這學期</h3>
+      <div style="margin-top:12px">${verdictBar(sum, total)}</div>
+      <div style="margin-top:14px">${classSpark()}</div>
+    </div></div>` : ""}
+
+    ${flagged.length ? groupHTML("值得聊一下", flagged, false,
+      "系統只負責指出值得對話的地方，不負責判斷誰有問題。每一行後面寫著它為什麼被挑出來。") : ""}
+    ${fine.length    ? groupHTML("一切正常", fine, "ok") : ""}
+    ${nothing.length ? groupHTML("還沒交", nothing, "none") : ""}
+    ${tRoster.length ? "" : `<p class="empty">還沒有人加入。把課程代碼給學生。</p>`}
   </section>`;
+}
+
+function groupHTML(title, list, foldKey, hint) {
+  const open = foldKey ? !tFold[foldKey] : true;
+  return `
+  <div style="margin-top:22px">
+    <div class="row" style="margin-bottom:8px">
+      ${foldKey
+        ? `<button class="btn btn--ghost btn--sm" data-tfold="${foldKey}">${open ? "▾" : "▸"} ${title} (${list.length})</button>`
+        : `<b style="font-size:15px">${title} (${list.length})</b>`}
+    </div>
+    ${hint ? `<p class="note" style="margin:-2px 0 10px">${hint}</p>` : ""}
+    ${open ? `<div class="stream">${list.map(rosterRow).join("")}</div>` : ""}
+  </div>`;
+}
+
+function rosterRow(s) {
+  const n = +s.turns_total;
+  const cnt = { adopt: +s.adopt, push: +s.pushback, reject: +s.reject,
+                choose: +s.choose, none: +s.unjudged };
+  return `<article class="turn">
+    <div class="turn__head">
+      <span class="vlabel">${esc(s.display_name)}</span>
+      <span class="chip">交了 ${s.logs_submitted} 份${n ? " · " + n + " 段" : ""}</span>
+      ${+s.turns_shared ? `<span class="chip">開放原文 ${s.turns_shared} 段</span>` : ""}
+      <span class="turn__time">${s.last_at ? clock(s.last_at) : "還沒有內容"}</span>
+    </div>
+    ${(s.flags || []).length ? `<div class="row" style="padding:10px 16px 0;margin-top:0">
+      ${s.flags.map(f => `<span class="chip" style="color:var(--adopt)">${esc(f)}</span>`).join("")}
+    </div>` : ""}
+    ${n ? `<div class="turn__q" style="padding-top:10px">${verdictBar(cnt, n)}</div>` : ""}
+    <div class="row" style="padding:0 16px 13px;margin-top:0">
+      <button class="btn btn--ghost btn--sm" data-tstu="${s.student}">看他交的紀錄</button>
+    </div>
+  </article>`;
+}
+
+/* 全班的時間分布：看是分散還是擠在截止前。
+   單一段對話可以演，整學期穩定分散演不出來。 */
+function classSpark() {
+  const keys = Object.keys(tDays).sort();
+  if (!keys.length) return "";
+  const from = new Date(keys[0] + "T00:00:00");
+  const to   = new Date(keys[keys.length - 1] + "T00:00:00");
+  const days = [];
+  for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+    const k = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+    days.push([k, tDays[k] || 0]);
+  }
+  const max = Math.max(1, ...days.map(d => d[1]));
+  const bars = days.map(([k, n]) =>
+    `<i title="${k}：${n} 段" style="height:${Math.max(6, Math.round(n / max * 100))}%;${
+      n ? "" : "opacity:.22;"}"></i>`).join("");
+  return `<div class="vkey" style="margin-bottom:5px"><span>使用時間分布</span></div>
+    <div class="spark">${bars}</div>
+    <div class="vkey" style="margin-top:4px">
+      <span>${keys[0]}</span><span style="margin-left:auto">${keys[keys.length - 1]}</span></div>`;
 }
 
 /* 一條比例條：這個學生的每一段各是什麼判定 */
@@ -678,44 +763,74 @@ function verdictBar(cnt, total) {
       ? `<span><i style="background:var(--${k})"></i>${label} ${cnt[k]}</span>` : "").join("")}</div>`;
 }
 
+/* ③ 單一學生 */
 function viewStudent() {
-  const s = tRoster.find(x => x.id === tWho);
+  const s = tRoster.find(x => x.student === tWho);
   if (!s) return "";
-  const log = tLogs.find(l => l.id === tLogId) || null;
+  const n = +s.turns_total;
+  const cnt = { adopt: +s.adopt, push: +s.pushback, reject: +s.reject,
+                choose: +s.choose, none: +s.unjudged };
+  const overall = tComments.find(c => !c.turn_id) || null;
+  const ts = logTurns();
 
   return `
   <section class="sec">
-    <span class="sec__label">Student</span>
-    <h2 class="sec__title">${esc(s.name)}</h2>
-    <div class="row">
+    <div class="row" style="margin-bottom:6px">
       <button class="btn btn--ghost btn--sm" id="tback">← 回班級</button>
-      ${tLogs.length ? `<select id="tlog" style="max-width:280px">
-        <option value="">選一份紀錄</option>
-        ${tLogs.map(l => `<option value="${l.id}" ${l.id === tLogId ? "selected" : ""}>${esc(l.title)}</option>`).join("")}
-      </select>` : `<span class="note">他還沒有標成課程作業的紀錄。</span>`}
     </div>
+    <span class="sec__label">Student</span>
+    <h2 class="sec__title">${esc(s.display_name)}</h2>
 
-    ${log ? `
-    <div class="box" style="margin-top:16px">
-      <div class="body" style="padding-top:16px">
-        <span class="sec__label">Ask</span>
-        <h3 class="sec__title" style="font-size:16px">可以問他這幾個問題</h3>
-        <p class="note" style="margin-top:4px">從紀錄本身的缺口長出來的，不是評分。
-          能不能當場答得出來，才是 AI 代替不了的部分。</p>
-        <ul class="land__pts" style="margin-top:12px">${followups(tTurns).map(q =>
-          `<li><span class="dot" style="background:var(--accent)"></span>${esc(q)}</li>`).join("")}</ul>
+    ${n ? `<div class="box" style="margin-top:14px"><div class="body" style="padding-top:16px">
+      <div style="margin-top:2px">${verdictBar(cnt, n)}</div>
+      <p class="note" style="margin-top:12px">
+        交了 ${s.logs_submitted} 份、${n} 段，開放原文 ${s.turns_shared} 段。
+        ${s.active_days ? `用了 ${s.active_days} 個不同的日子。` : ""}
+        ${+s.why_missing ? `有 ${s.why_missing} 段照單全收沒寫為什麼。` : ""}</p>
+    </div></div>` : ""}
+
+    <div class="box" style="margin-top:14px"><div class="body" style="padding-top:16px">
+      <span class="sec__label">Comment</span>
+      <h3 class="sec__title" style="font-size:16px">給他的總評</h3>
+      <p class="note" style="margin-top:4px">他看得到這段話。評語是回饋，藏起來沒意義。</p>
+      <textarea id="tnote" rows="3" style="margin-top:10px"
+        placeholder="整學期下來你想跟他說的一句話">${esc(overall?.body || "")}</textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn btn--sm" data-tsave="overall">儲存總評</button>
+        ${overall ? `<span class="note">上次更新 ${clock(overall.updated_at || overall.created_at)}</span>` : ""}
       </div>
+    </div></div>
+
+    <div class="row" style="margin-top:18px">
+      ${tLogs.length ? `<select id="tlog" style="max-width:300px">
+        <option value="">選一份紀錄</option>
+        ${tLogs.map(l => `<option value="${l.id}" ${l.id === tLogId ? "selected" : ""}>${
+          esc(l.title)}（${tTurns.filter(t => t.log_id === l.id).length} 段）</option>`).join("")}
+      </select>` : `<span class="note">他還沒有交給這門課的紀錄。</span>`}
     </div>
 
-    <p class="sec__hint" style="margin-top:18px">${tTurns.length} 段。
-      原文預設收著——<b>你每展開一次，他都看得到</b>。先看判定，需要才展開。</p>
-    <div class="stream">${tTurns.map((t, i) => tTurnHTML(t, i)).join("")}</div>` : ""}
+    ${tLogId ? `
+    <div class="box" style="margin-top:14px"><div class="body" style="padding-top:16px">
+      <span class="sec__label">Ask</span>
+      <h3 class="sec__title" style="font-size:16px">可以問他這幾個問題</h3>
+      <p class="note" style="margin-top:4px">從紀錄本身的缺口長出來的，不是評分。
+        能不能當場答得出來，才是 AI 代替不了的部分。</p>
+      <ul class="land__pts" style="margin-top:12px">${followups(ts).map(q =>
+        `<li><span class="dot" style="background:var(--accent)"></span>${esc(q)}</li>`).join("")}</ul>
+    </div></div>
+
+    <p class="sec__hint" style="margin-top:18px">${ts.length} 段。
+      <b>原文預設看不到</b>——那是資料庫擋的。需要看內容的話按「請他開放」，由他決定給不給。</p>
+    <div class="stream">${ts.map((t, i) => tTurnHTML(t, i)).join("")}</div>` : ""}
   </section>`;
 }
 
+/* ④ 單一輪 */
 function tTurnHTML(t, i) {
   const v = t.ai?.verdict;
   const open = !!tOpen[t.id];
+  const req = tReqs.find(r => r.turn_id === t.id);
+  const cm = tComments.find(c => c.turn_id === t.id);
   return `<article class="turn ${v ? `turn--${V[v].cls}` : ""}">
     <div class="turn__head">
       <span class="seq">${p2(i + 1)}</span>
@@ -723,25 +838,77 @@ function tTurnHTML(t, i) {
       ${t.opens ? `<span class="chip">已查閱</span>` : ""}
       <span class="turn__time">${clock(t.captured_at)}</span>
     </div>
-    <div class="turn__q"><b>學生說</b>${esc(t.q)}</div>
+
     ${t.ai?.basis ? `<div class="basis"><b>AI 判定依據</b><q>${esc(t.ai.basis)}</q></div>` : ""}
-    ${(t.why || "").trim() ? `<div class="why">
-      <p class="why__done"><b>他補的說明</b>${esc(t.why)}</p>
-      <div class="row" style="margin-top:6px">${whyMeta(t)}</div>
-    </div>` : ""}
-    ${open
-      ? `<div class="turn__a"><b>AI 回覆 · 擷取當下的原文</b>${esc(t.a)}</div>`
+
+    ${(t.why || "").trim()
+      ? `<div class="why">
+          <p class="why__done"><b>他寫的為什麼</b>${esc(t.why)}</p>
+          <div class="row" style="margin-top:6px">${whyMeta(t)}</div>
+        </div>`
+      : (v === "adopt" ? `<div class="why"><p class="note">照單全收，而且沒有留下說明。</p></div>` : "")}
+
+    ${t.shared
+      ? (open
+          ? `<div class="turn__q"><b>他問的</b>${esc(t.q)}</div>
+             <div class="turn__a"><b>AI 回覆 · 擷取當下的原文</b>${esc(t.a)}</div>`
+          : `<div class="row" style="padding:0 16px 13px">
+               <button class="btn btn--ghost btn--sm" data-topen="${t.id}">他已開放，展開原文（會留痕）</button>
+             </div>`)
       : `<div class="row" style="padding:0 16px 13px">
-           <button class="btn btn--ghost btn--sm" data-topen="${t.id}">展開 AI 原文（會留痕）</button>
+           <span class="note">原文未開放 · 他問了 ${t.q_len} 字、AI 回了 ${t.a_len} 字</span>
+           ${req
+             ? `<span class="chip" style="color:var(--${
+                 req.state === "granted" ? "accent" : req.state === "declined" ? "reject" : "adopt"})">${
+                 req.state === "pending" ? "已送出請求，等他回應"
+                 : req.state === "declined" ? "他選擇不開放" : "他已同意"}</span>`
+             : `<button class="btn btn--ghost btn--sm" data-task="${t.id}">請他開放這一段</button>`}
          </div>`}
+
+    <div class="row" style="padding:0 16px 14px;margin-top:0;align-items:flex-start">
+      <textarea data-tcm="${t.id}" rows="2" style="flex:1"
+        placeholder="對這一段說一句話（他看得到）">${esc(cm?.body || "")}</textarea>
+      <button class="btn btn--ghost btn--sm" data-tsave="${t.id}">存</button>
+    </div>
   </article>`;
 }
 
 /* ---------- 畫面 ---------- */
 function render() {
   document.getElementById("app").innerHTML =
-    me ? (isTeacher() ? viewTeacher() : viewApp())
+    me ? (isTeacher() ? viewTeacher() : (joinPick ? viewJoinPick() : viewApp()))
        : (view === "land" ? viewLand() : viewGate());
+}
+
+/* 剛加入一門課：自己挑要交哪幾份。
+   預設一份都沒勾——加入課程不等於把整個帳號攤開給老師看。 */
+function viewJoinPick() {
+  const pick = logs.filter(l => l.scope !== "course");
+  const n = Object.values(joinSel).filter(Boolean).length;
+  return `${mastheadHTML()}
+  <section class="sec">
+    <span class="sec__label">Joined</span>
+    <h2 class="sec__title">加入了「${esc(joinPick.name)}」</h2>
+    <p class="sec__hint">現在挑要交給這門課的紀錄。<b>預設一份都沒交</b>——
+      沒勾的老師看不到，也不會知道它存在。之後隨時可以在每一份紀錄上改。</p>
+
+    ${pick.length ? `<div class="stream">${pick.map(l => `
+      <article class="turn" style="cursor:pointer" data-jpick="${l.id}">
+        <div class="turn__head">
+          <span class="vlabel">${joinSel[l.id] ? "✓ " : "　"}${esc(l.title)}</span>
+          <span class="chip">${turnCount[l.id] || 0} 段</span>
+          <span class="turn__time">${clock(l.created_at)}</span>
+        </div>
+      </article>`).join("")}</div>`
+      : `<p class="empty">你還沒有任何紀錄可以交。</p>`}
+
+    <div class="row" style="margin-top:16px">
+      <button class="btn btn--sm" id="jsubmit">${n ? `交出這 ${n} 份` : "一份都不交"}</button>
+      <button class="btn btn--ghost btn--sm" id="jskip">之後再說</button>
+      <span class="note">交出去之後，老師看得到你的判定和你寫的「為什麼」，
+        但看不到對話原文——原文要你一輪一輪開放。</span>
+    </div>
+  </section>`;
 }
 
 /* ---------- 登入前的門面 ----------
@@ -1323,11 +1490,37 @@ function turnHTML(t, i) {
     </article>`;
   }
 
+  const req = myReqs.find(r => r.turn_id === t.id && r.state === "pending");
+  const cm  = myComments.find(c => c.turn_id === t.id);
+  const inCourse = cur()?.scope === "course";
+
   return `<article class="turn ${tone}">${head}
     <div class="turn__q"><b>你說</b>${esc(t.q)}</div>
     <div class="turn__a"><b>AI 回覆 · 擷取當下的原文</b>${esc(t.a)}</div>
     ${t.ai?.basis ? `<div class="basis"><b>AI 判定依據</b><q>${esc(t.ai.basis)}</q></div>` : ""}
     ${needsWhy(t) ? `<div class="why">${whyHTML(t)}</div>` : ""}
+
+    ${req ? `<div class="why" style="border-color:var(--adopt)">
+      <p class="why__done"><b>老師想看這一段的原文</b>${
+        req.note ? esc(req.note) : "（他沒有附上問題）"}</p>
+      <div class="row" style="margin-top:8px">
+        <button class="btn btn--sm" data-ans="${req.id}|1">開放給他看</button>
+        <button class="btn btn--ghost btn--sm" data-ans="${req.id}|0">這一段不開放</button>
+        <span class="note">不開放也可以。你的選擇會留在紀錄裡，他看得到。</span>
+      </div>
+    </div>` : ""}
+
+    ${cm ? `<div class="why" style="border-color:var(--accent)">
+      <p class="why__done"><b>老師的話</b>${esc(cm.body)}</p>
+    </div>` : ""}
+
+    ${inCourse ? `<div class="row" style="padding:0 16px 13px;margin-top:0">
+      ${t.shared
+        ? `<span class="chip" style="color:var(--accent)">老師看得到這一段的原文</span>
+           <button class="btn btn--ghost btn--sm" data-share="${t.id}|0">收回</button>`
+        : `<span class="note">老師看得到你的判定和說明，看不到原文。</span>
+           <button class="btn btn--ghost btn--sm" data-share="${t.id}|1">給老師看原文</button>`}
+    </div>` : ""}
   </article>`;
 }
 
@@ -1556,10 +1749,61 @@ document.addEventListener("click", async (e) => {
     await loadAll(); await loadCourse(row.id); render(); return;
   }
 
+  const tc = t.closest("[data-tcourse]");
+  if (tc) { await loadCourse(tc.dataset.tcourse); render(); return; }
+  if (t.id === "tcback") { await loadCourse(null); tCourse = null; render(); return; }
+
+  const tf = t.closest("[data-tfold]");
+  if (tf) { const k = tf.dataset.tfold; tFold[k] = !tFold[k]; render(); return; }
+
   const ts1 = t.closest("[data-tstu]");
   if (ts1) { await openStudent(ts1.dataset.tstu); render(); return; }
 
-  if (t.id === "tback") { tWho = null; tLogId = null; tTurns = []; render(); return; }
+  if (t.id === "tback") { tWho = null; tLogId = null; tTurns = []; tComments = []; render(); return; }
+
+  /* 請老師開放某一輪。老師看不到原文，但看得到這一輪是照單全收、
+     看得到他寫的那句話——要不要給看，由學生決定。拒絕也留痕。 */
+  const tk1 = t.closest("[data-task]");
+  if (tk1) {
+    const id = tk1.dataset.task;
+    const row = tTurns.find(x => x.id === id);
+    const note = prompt("想問他什麼？（可留空，他會看到這句話）", "這一段你當時怎麼確認是對的？");
+    if (note === null) return;
+    const { error } = await sb.from("view_requests").insert({
+      turn_id: id, course_id: tCourse, teacher: me.id, student: row.owner,
+      note: note.trim() || null
+    });
+    if (error) { tMsg = "送不出去：" + error.message; render(); return; }
+    const { data } = await sb.from("view_requests").select("*").eq("course_id", tCourse);
+    tReqs = data || []; render(); return;
+  }
+
+  /* 存評語。總評是 turn_id = null 那一筆，單輪評語各自一筆。 */
+  const tsv = t.closest("[data-tsave]");
+  if (tsv) {
+    const key = tsv.dataset.tsave;
+    const isOverall = key === "overall";
+    const box = isOverall ? document.getElementById("tnote")
+                          : document.querySelector(`[data-tcm="${key}"]`);
+    const body = (box?.value || "").trim();
+    const old = tComments.find(c => isOverall ? !c.turn_id : c.turn_id === key);
+
+    if (!body) {
+      if (old) { await sb.from("course_comments").delete().eq("id", old.id); }
+    } else if (old) {
+      await sb.from("course_comments").update({ body, updated_at: new Date().toISOString() })
+        .eq("id", old.id);
+    } else {
+      const { error } = await sb.from("course_comments").insert({
+        course_id: tCourse, student: tWho, turn_id: isOverall ? null : key,
+        author: me.id, body
+      });
+      if (error) { tMsg = "存不起來：" + error.message; render(); return; }
+    }
+    const { data } = await sb.from("course_comments").select("*")
+      .eq("course_id", tCourse).eq("student", tWho).order("created_at", { ascending: true });
+    tComments = data || []; tMsg = "存好了，他看得到。"; render(); return;
+  }
 
   // 展開原文：先把「誰在什麼時候展開的」記下來，再顯示。
   // 順序是故意的——留痕失敗就不給看，不然留痕只是裝飾。
@@ -1686,13 +1930,52 @@ document.addEventListener("click", async (e) => {
     await loadAll(); render(); return;
   }
 
+  /* 加入課程不等於交出紀錄。加入之後跳一張清單，自己勾要交哪幾份。
+     這一步是整個設計的關鍵——預設一份都不交。 */
   if (t.id === "join") {
     const code = document.getElementById("code").value.trim();
     if (!code) return;
-    const { error } = await sb.rpc("join_course", { _code: code });
-    msg = error ? error.message : "加入了。";
-    if (!error) await loadAll();
+    const { data, error } = await sb.rpc("join_course", { _code: code });
+    if (error) { msg = error.message; render(); return; }
+    await loadAll();
+    joinPick = data; joinSel = {};
+    msg = ""; render(); return;
+  }
+
+  const js = t.closest("[data-jpick]");
+  if (js) { const id = js.dataset.jpick; joinSel[id] = !joinSel[id]; render(); return; }
+
+  if (t.id === "jskip") { joinPick = null; joinSel = {}; render(); return; }
+
+  if (t.id === "jsubmit") {
+    const ids = Object.keys(joinSel).filter(k => joinSel[k]);
+    if (!ids.length) { joinPick = null; joinSel = {}; msg = "一份都沒交。之後隨時可以在每份紀錄上改。"; render(); return; }
+    const { data, error } = await sb.rpc("submit_logs", { _course: joinPick.course, _logs: ids });
+    msg = error ? error.message : `交出 ${data.submitted} 份。老師看得到判定和你寫的說明，看不到原文。`;
+    joinPick = null; joinSel = {};
+    await loadAll(); await loadTurns(); render(); return;
+  }
+
+  /* 單輪開放／收回。收回之後老師立刻讀不到，而且兩個動作都留痕。 */
+  const sh = t.closest("[data-share]");
+  if (sh) {
+    const [id, on] = sh.dataset.share.split("|");
+    const { error } = await sb.from("turns").update({ shared: on === "1" }).eq("id", id);
+    if (error) { msg = "改不動：" + error.message; render(); return; }
+    const row = turns.find(x => x.id === id);
+    if (row) row.shared = on === "1";
+    msg = on === "1" ? "開放了，老師讀得到這一段的原文。" : "收回了，老師已經讀不到。";
     render(); return;
+  }
+
+  /* 回應老師的查看請求。同意＝開放那一輪，由資料庫一起做，不會只做一半。 */
+  const an = t.closest("[data-ans]");
+  if (an) {
+    const [id, yes] = an.dataset.ans.split("|");
+    const { error } = await sb.rpc("answer_request", { _id: id, _grant: yes === "1" });
+    if (error) { msg = error.message; render(); return; }
+    msg = yes === "1" ? "開放了。" : "沒有開放——他會看到你選擇不開放，但看不到內容。";
+    await loadAll(); await loadTurns(); render(); return;
   }
 
   if (t.id === "savekey") {
@@ -1781,10 +2064,8 @@ document.addEventListener("change", async (e) => {
   if (e.target.id === "prov") {
     localStorage.setItem("jl_provider", e.target.value); msg = ""; render(); return;
   }
-  if (e.target.id === "tpick") { await loadCourse(e.target.value || null); render(); return; }
   if (e.target.id === "tlog")  {
-    if (e.target.value) await openStudentLog(e.target.value);
-    else { tLogId = null; tTurns = []; }
+    openStudentLog(e.target.value || null);
     render(); return;
   }
   if (e.target.id === "setcat") {

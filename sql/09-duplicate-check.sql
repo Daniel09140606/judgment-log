@@ -39,7 +39,11 @@ as $$
   select
     t.log_id,
     l.title,
-    left(regexp_replace(t.q, '\s+', ' ', 'g'), 40),
+    -- 分組是用前 300 字，顯示只要前 40 字。
+    -- 這裡一定要用聚合函式包起來：顯示的表達式跟 group by 的表達式不一樣，
+    -- 直接寫 left(t.q, 40) 會被 PostgreSQL 擋下來（must appear in the GROUP BY clause）。
+    -- 2026-10-03 把 01～11 依序裝一次才發現這支從頭到尾沒跑起來過。
+    min(left(regexp_replace(t.q, '\s+', ' ', 'g'), 40)),
     count(*),
     min(t.captured_at),
     max(t.captured_at),
