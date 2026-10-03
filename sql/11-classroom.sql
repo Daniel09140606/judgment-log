@@ -161,6 +161,58 @@ drop trigger if exists vr_guard on public.view_requests;
 create trigger vr_guard before update on public.view_requests
   for each row execute function public.guard_vr_update();
 
+-- ---------- 評語 ----------
+-- 學生看得到。老師的評語本身就是回饋，藏起來沒意義；
+-- 而且看得到才讓這套系統是「對話」，不是「監控」。
+--   turn_id 是 null → 給這個學生的總評
+--   turn_id 有值     → 針對某一輪的評語
+create table if not exists public.course_comments (
+  id         uuid primary key default gen_random_uuid(),
+  course_id  uuid not null references public.courses(id) on delete cascade,
+  student    uuid not null references auth.users(id)     on delete cascade,
+  turn_id    uuid references public.turns(id) on delete cascade,
+  author     uuid not null references auth.users(id)     on delete cascade,
+  body       text not null check (btrim(body) <> ''),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists course_comments_student_idx
+  on public.course_comments(course_id, student, created_at);
+
+alter table public.course_comments enable row level security;
+
+drop policy if exists cc_read on public.course_comments;
+create policy cc_read on public.course_comments
+  for select using (
+    student = auth.uid()                       -- 學生看得到寫給自己的
+    or exists (select 1 from public.courses c
+                where c.id = course_comments.course_id and c.teacher = auth.uid())
+  );
+
+-- 只有這門課的老師寫得了，而且對象必須真的修這門課。
+-- 這裡每一個 course_id 都要寫完整的 course_comments.course_id：
+-- 子查詢裡的 e.course_id 會把沒加前綴的 course_id 吃掉，
+-- 條件就變成 e.course_id = e.course_id（永遠成立），
+-- 等於任何老師都能對任何學生留言。寫得囉嗦一點，換一個擋得住的條件。
+drop policy if exists cc_write on public.course_comments;
+create policy cc_write on public.course_comments
+  for insert with check (
+    author = auth.uid()
+    and exists (select 1 from public.courses c
+                 where c.id = course_comments.course_id and c.teacher = auth.uid())
+    and exists (select 1 from public.enrollments e
+                 where e.course_id = course_comments.course_id
+                   and e.student   = course_comments.student)
+  );
+
+drop policy if exists cc_edit on public.course_comments;
+create policy cc_edit on public.course_comments
+  for update using (author = auth.uid()) with check (author = auth.uid());
+
+drop policy if exists cc_del on public.course_comments;
+create policy cc_del on public.course_comments
+  for delete using (author = auth.uid());
+
 -- ---------- 班級總覽 ----------
 -- 一列一個學生。老師第一眼看到的就是這個。
 --

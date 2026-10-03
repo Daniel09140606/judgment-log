@@ -332,6 +332,7 @@ let myReqs = [];                  // 學生端：老師對我發的查看請求
 let myComments = [];              // 學生端：老師寫給我的評語
 let joinPick = null;              // 學生端：剛加入課程，正在勾要交哪幾份
 let joinSel = {};                 // 勾選狀態
+let joinOpenAll = false;          // 交出的同時要不要一起開放原文（預設不要）
 let tokens = [];                  // 我發出去的匯入代碼
 let cats = [];                    // 我自己建的分類
 let turnCount = {};               // 每份紀錄有幾段，導覽上要顯示
@@ -902,11 +903,21 @@ function viewJoinPick() {
       </article>`).join("")}</div>`
       : `<p class="empty">你還沒有任何紀錄可以交。</p>`}
 
+    ${n ? `<div class="scopebar" style="margin-top:16px">
+      <span class="scopebar__lab">對話原文</span>
+      <div class="seg">
+        <button data-jall="0" aria-pressed="${!joinOpenAll}">先不開放</button>
+        <button data-jall="1" aria-pressed="${joinOpenAll}">一起開放</button>
+      </div>
+      <span class="scopebar__hint">${joinOpenAll
+        ? "交出去的同時，這幾份的對話原文老師全部讀得到。之後可以整份或單段收回。"
+        : "預設不開放。老師看得到你的判定和你寫的「為什麼」，但讀不到對話內容。"}</span>
+    </div>` : ""}
+
     <div class="row" style="margin-top:16px">
       <button class="btn btn--sm" id="jsubmit">${n ? `交出這 ${n} 份` : "一份都不交"}</button>
       <button class="btn btn--ghost btn--sm" id="jskip">之後再說</button>
-      <span class="note">交出去之後，老師看得到你的判定和你寫的「為什麼」，
-        但看不到對話原文——原文要你一輪一輪開放。</span>
+      <span class="note">交出去之後隨時可以改——整份收回、或是單獨某一段。</span>
     </div>
   </section>`;
 }
@@ -1212,8 +1223,23 @@ function viewApp() {
       </div>
       <span class="scopebar__hint">${log.scope === "self"
         ? "只有你看得到，老師查不到這一份。"
-        : (log.course_id ? "已掛在課程底下，老師看得到。" : "還沒掛到任何課程，老師目前還看不到——到下面加入課程。")}</span>
+        : (log.course_id ? "已掛在課程底下，老師看得到判定和你寫的說明。" : "還沒掛到任何課程，老師目前還看不到——到下面加入課程。")}</span>
     </div>
+
+    ${log.scope === "course" && log.course_id ? (() => {
+      const n = turns.length, on = turns.filter(t => t.shared).length;
+      return `<div class="scopebar">
+        <span class="scopebar__lab">對話原文</span>
+        <div class="seg">
+          <button data-shareall="1" aria-pressed="${n > 0 && on === n}">全部開放</button>
+          <button data-shareall="0" aria-pressed="${on === 0}">全部不開放</button>
+        </div>
+        <span class="scopebar__hint">${
+          on === 0 ? "老師看得到你的判定和「為什麼」，看不到任何一句原文。"
+          : on === n ? `這 ${n} 段的原文老師都讀得到。`
+          : `${n} 段裡開放了 ${on} 段。`
+        } 單獨某一段要開或收，在下面每一段自己按。</span>
+      </div>`; })() : ""}
 
     <div class="scopebar">
       <span class="scopebar__lab">分類</span>
@@ -1947,13 +1973,47 @@ document.addEventListener("click", async (e) => {
 
   if (t.id === "jskip") { joinPick = null; joinSel = {}; render(); return; }
 
+  const ja = t.closest("[data-jall]");
+  if (ja) { joinOpenAll = ja.dataset.jall === "1"; render(); return; }
+
   if (t.id === "jsubmit") {
     const ids = Object.keys(joinSel).filter(k => joinSel[k]);
-    if (!ids.length) { joinPick = null; joinSel = {}; msg = "一份都沒交。之後隨時可以在每份紀錄上改。"; render(); return; }
+    if (!ids.length) { joinPick = null; joinSel = {}; joinOpenAll = false;
+      msg = "一份都沒交。之後隨時可以在每份紀錄上改。"; render(); return; }
     const { data, error } = await sb.rpc("submit_logs", { _course: joinPick.course, _logs: ids });
-    msg = error ? error.message : `交出 ${data.submitted} 份。老師看得到判定和你寫的說明，看不到原文。`;
-    joinPick = null; joinSel = {};
+    if (error) { msg = error.message; render(); return; }
+
+    // 交出去的同時一起開放原文。這是你剛才按下去的選擇，不是預設值。
+    let opened = 0;
+    if (joinOpenAll) {
+      const { data: up, error: e2 } = await sb.from("turns")
+        .update({ shared: true }).in("log_id", ids).select("id");
+      if (e2) { msg = `交出 ${data.submitted} 份，但原文沒開放成功：${e2.message}`;
+        joinPick = null; joinSel = {}; joinOpenAll = false;
+        await loadAll(); await loadTurns(); render(); return; }
+      opened = (up || []).length;
+    }
+    msg = `交出 ${data.submitted} 份。` + (joinOpenAll
+      ? `${opened} 段的原文也一起開放了。`
+      : "老師看得到判定和你寫的說明，看不到原文。");
+    joinPick = null; joinSel = {}; joinOpenAll = false;
     await loadAll(); await loadTurns(); render(); return;
+  }
+
+  /* 整份開放／收回。一段一段按太煩，但預設仍然是關著的——
+     這個按鈕是你主動按下去的，不是系統替你決定的。
+     每一段還是各自留痕，收回時也一樣。 */
+  const sa = t.closest("[data-shareall]");
+  if (sa) {
+    const on = sa.dataset.shareall === "1";
+    const log = cur(); if (!log) return;
+    if (on && !confirm(`把這份紀錄 ${turns.length} 段的對話原文全部開放給老師？\n`
+      + `之後還是可以單獨收回某一段。`)) return;
+    const { error } = await sb.from("turns").update({ shared: on }).eq("log_id", log.id);
+    if (error) { msg = "改不動：" + error.message; render(); return; }
+    turns.forEach(x => { x.shared = on; });
+    msg = on ? `${turns.length} 段的原文都開放了。` : "全部收回了，老師已經讀不到任何一段原文。";
+    render(); return;
   }
 
   /* 單輪開放／收回。收回之後老師立刻讀不到，而且兩個動作都留痕。 */
