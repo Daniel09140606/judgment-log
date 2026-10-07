@@ -1603,7 +1603,11 @@ async function askModel(prompt) {
       "anthropic-dangerous-direct-browser-access": "true"
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-5", max_tokens: 2000,
+      // 每批 20 段，回來的 JSON 大約 1000 token 上下。
+      // 本來設 2000 是照「一次判一小份」估的；一旦一次判上百段，
+      // 輸出會在中途被切斷，然後 JSON.parse 炸掉——而且錯誤訊息
+      // 看起來像「格式不對」，完全看不出真正原因是被截斷。
+      model: "claude-sonnet-4-5", max_tokens: 4000,
       messages: [{ role: "user", content: prompt }]
     })
   });
@@ -1611,6 +1615,31 @@ async function askModel(prompt) {
   const out = await res.json();
   return (out.content || []).map(c => c.text || "").join("");
 }
+
+/* 對方忙線就等一下再送。
+   503 / 429 / 500 這幾個是「現在沒空」，不是「你寫錯了」——
+   等幾秒重送幾乎都會過。原本的寫法是一撞到就整批放棄，
+   等於把一個會自己好的問題，變成使用者要自己重按的問題。 */
+const RETRY_WAIT = [2000, 5000, 12000];
+
+async function askModelRetry(prompt, label) {
+  for (let i = 0; i <= RETRY_WAIT.length; i++) {
+    try { return await askModel(prompt); }
+    catch (e) {
+      const busyNow = /\b(429|500|502|503|504)\b/.test(e.message)
+                   || /UNAVAILABLE|overloaded|high demand|rate.?limit/i.test(e.message);
+      if (!busyNow || i === RETRY_WAIT.length) throw e;
+      msg = `${label}　對方忙線，${RETRY_WAIT[i] / 1000} 秒後重試（第 ${i + 1} 次）`;
+      render();
+      await new Promise(r => setTimeout(r, RETRY_WAIT[i]));
+    }
+  }
+}
+
+/* 一次判幾段。
+   123 段一次送，是「全有全無」：中途失敗，前面做的全部白費。
+   分批之後每批各自成功或失敗，已經判好的會留著。 */
+const JUDGE_BATCH = 20;
 
 async function runAnalysis() {
   if (!turns.length) return;
@@ -1621,10 +1650,27 @@ async function runAnalysis() {
     document.getElementById("keybox")?.scrollIntoView({ behavior: "smooth", block: "center" });
     return;
   }
-  busy = true; msg = "判讀中，可能要半分鐘…"; render();
-  const transcript = turns.map((t, i) =>
-    `[${i + 1}] 學生說：${t.q}\n    AI 回覆：${t.a}`).join("\n\n");
-  const prompt =
+  busy = true;
+
+  // 還沒判過的才送。重跑一次就接著上次停的地方，不用從頭花錢花時間。
+  // 全部都判過了才當成「重新判讀」，整份重來。
+  const pending = turns.some(t => !t.ai?.verdict);
+
+  let done = 0, failed = 0, firstErr = "";
+  const total = pending ? turns.filter(t => !t.ai?.verdict).length : turns.length;
+
+  for (let s = 0; s < turns.length; s += JUDGE_BATCH) {
+    const slice = turns.slice(s, s + JUDGE_BATCH);
+    if (pending && slice.every(t => t.ai?.verdict)) continue;   // 這批判過了，跳過
+
+    // 判準看的是「下一則學生說了什麼」，所以每批要多附一段當參考，
+    // 否則切點上的那一段永遠判不準——這是分批最容易踩到的坑。
+    const next = turns[s + JUDGE_BATCH];
+    const transcript = slice.map((t, i) =>
+      `[${i + 1}] 學生說：${t.q}\n    AI 回覆：${t.a}`).join("\n\n")
+      + (next ? `\n\n[參考，不要判這一段] 學生接著說：${next.q}` : "");
+
+    const prompt =
 `你要判讀一份「學生與 AI 的對話紀錄」，判斷學生對 AI 的每一則回覆是照單全收，還是有推回去。
 
 判準（看的是「下一則學生說了什麼」）：
@@ -1635,29 +1681,42 @@ async function runAnalysis() {
 
 另外對每一筆標 reasoned：學生那一句有沒有講出理由或取捨（只說「好」「就這個」不算）。verdict 是 choose 時這欄最重要，其他一律 true。
 
+這是整份紀錄的其中一段，編號從 1 開始重新算。標「參考」的那一段只是給你看下一句，不要輸出它的判定。
+
 對話紀錄：
 ${transcript}
 
-只輸出 JSON，不要有其他文字：
+只輸出 JSON，不要有其他文字，共 ${slice.length} 筆：
 {"items":[{"i":1,"verdict":"push","reasoned":true,"basis":"引用學生原話當證據，25字內"}]}`;
 
-  try {
-    const text = await askModel(prompt);
-    const json = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
-    const items = Array.isArray(json.items) ? json.items : [];
+    const label = `判讀中 ${done}/${total}…`;
+    msg = label; render();
 
-    for (const it of items) {
-      const t = turns[(it.i | 0) - 1];
-      if (!t || !V[it.verdict]) continue;
-      const ai = { verdict: it.verdict, reasoned: it.reasoned !== false,
-                   basis: String(it.basis || ""), judged_at: new Date().toISOString() };
-      await sb.from("turns").update({ ai }).eq("id", t.id);
-      t.ai = ai;
+    try {
+      const text = await askModelRetry(prompt, label);
+      const json = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
+      const items = Array.isArray(json.items) ? json.items : [];
+
+      for (const it of items) {
+        const t = slice[(it.i | 0) - 1];
+        if (!t || !V[it.verdict]) continue;
+        const ai = { verdict: it.verdict, reasoned: it.reasoned !== false,
+                     basis: String(it.basis || ""), judged_at: new Date().toISOString() };
+        // 每一批判完就寫回資料庫。中途斷掉，前面判好的已經存住了。
+        await sb.from("turns").update({ ai }).eq("id", t.id);
+        t.ai = ai;
+        done++;
+      }
+    } catch (e) {
+      failed += slice.length;
+      if (!firstErr) firstErr = e.message;
+      console.warn("[判斷紀錄] 這一批判讀失敗", e);
     }
-    msg = `判讀完成，共 ${items.length} 段。`;
-  } catch (e) {
-    msg = "判讀失敗：" + e.message;
   }
+
+  msg = failed
+    ? `判讀完成 ${done} 段，${failed} 段沒成功（已判好的都存住了，再按一次會接著跑）。原因：${firstErr}`
+    : `判讀完成，共 ${done} 段。`;
   busy = false; render();
 }
 

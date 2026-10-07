@@ -38,10 +38,22 @@ function render(keys) {
   const turns  = mine.reduce((n, k) => n + (store[k].turns || []).length, 0);
 
   if (!owner) {
-    status.className = "status warn";
-    status.innerHTML = `<b>還沒指定歸屬。</b>打開判斷紀錄網站並登入，這裡就會顯示你的名字，`
-      + `之後擷取到的對話會直接算在你名下。在那之前擷取到的東西會扣在本機不送出。`
-      + (none.length ? `<br>目前有 <b>${none.length}</b> 個未指定歸屬的對話。` : "");
+    // 有兩種「沒有歸屬」，結果完全不同，不能用同一段話打發：
+    //   貼過匯入代碼 → 照樣會送，記在代碼主人名下。這不是錯誤狀態。
+    //   什麼都沒有   → 真的扣在本機。
+    // 之前這裡一律叫人「打開網站並登入」，但手動貼碼的人登入了也不會變，
+    // 等於叫人去做一件做不到的事。
+    const ep0 = store.endpoint;
+    status.className = ep0 ? "status" : "status warn";
+    status.innerHTML = ep0
+      ? `<b>這台電腦沒有指定歸屬。</b>擷取到的對話會記在<b>匯入代碼主人</b>名下，照常送出。`
+        + `<br>多人共用這台電腦的話，請改到判斷紀錄網站登入後發碼——那條路會把「你是誰」一起帶進來。`
+        + (none.length ? `<br>目前有 <b>${none.length}</b> 個對話待送。` : "")
+      : `<b>還沒設定。</b>兩條路選一條：`
+        + `<br>① 打開判斷紀錄網站登入，這裡就會顯示你的名字；`
+        + `<br>② 或是直接在下面貼一組匯入代碼。`
+        + `<br>在那之前擷取到的東西會扣在本機不送出。`
+        + (none.length ? `<br>目前有 <b>${none.length}</b> 個對話扣在本機。` : "");
   } else {
     status.className = "status";
     status.innerHTML = `目前歸屬：<b class="ok">${esc(owner.name || owner.id.slice(0, 8))}</b><br>`

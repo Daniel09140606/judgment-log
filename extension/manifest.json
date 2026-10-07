@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "判斷紀錄 擷取器",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "在你跟 AI 對話的當下把往返擷取下來，成為判斷紀錄的原始資料。",
   "permissions": ["storage", "alarms"],
   "host_permissions": [
@@ -9,7 +9,8 @@
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
     "https://gemini.google.com/*",
-    "https://*.supabase.co/*"
+    "https://*.supabase.co/*",
+    "https://daniel09140606.github.io/judgment-log/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -24,6 +25,13 @@
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "_comment": "bridge 讓網站告訴外掛『現在登入的是誰』，公用電腦才不會把對話記錯人。網址換了就改這一行；沒有 bridge 也能用，改在外掛視窗貼匯入代碼。",
+      "matches": ["https://daniel09140606.github.io/judgment-log/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "action": {
